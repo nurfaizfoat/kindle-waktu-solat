@@ -1,3 +1,5 @@
+![Waktu Solat on a Kindle Paperwhite 3](Waktu%20Solat%20Kindle%20Promo.png)
+
 # Kindle Prayer-Times Display
 
 A jailbroken Kindle Paperwhite 3 is used as a wall / prayer-times display. A
@@ -15,36 +17,13 @@ stock clock/battery chrome is drawn over the board.
 - Launcher: **library scriptlets** (this firmware has no KUAL and no working
   Kindlet launcher, and no SSH).
 
-> Repository remote: **not yet published** (placeholder). There is no clone URL
-> for this project at the time of writing.
+> Repository: <https://github.com/nurfaizfoat/kindle-waktu-solat>
 
 ---
 
 ## How it works
 
-```
-PHP server                     Kindle (PW3)                         Panel
------------                    ------------                         -----
-dashboard/board.php  --PNG-->  bin/refresh.sh
-  (1072x1448, 16-colour          1. fetch over plain HTTP
-   palette, no-store)            2. validate magic bytes + 2 MiB cap
-                                 3. normalise to 8-bit on-device
-                                    (linkss ImageMagick -> /tmp)
-                                 4. eips gate (test-format.sh)
-                                        |
-                                        v
-                                  /mnt/us/dashboard/board.png
-                                  bin/set-screensaver.sh
-                                        |
-                                        v
-                                  /mnt/us/linkss/screensavers/
-                                    bg_large_ss00.png
-                                        |
-                                        v
-                                  linkss (ScreenSavers hack)  ------> native
-                                  used by the native sleep path       sleep
-                                                                      screen
-```
+![How the generated dashboard image reaches the Kindle sleep screen](Kindle%20Dashboard%20PNG%20Flow.png)
 
 1. **Server renders the PNG.** `dashboard/board.php` is a web entry point that
    renders the board on demand (no cron, no CLI) and serves it with
