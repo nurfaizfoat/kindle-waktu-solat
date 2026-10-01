@@ -1,0 +1,58 @@
+{
+	"items": [
+	{
+		"name": "Screensaver Board",
+		"priority": 0,
+		"items": [
+		{
+			"name": "Diagnose (read-only)",
+			"priority": 1,
+			"action": "./bin/diagnose.sh",
+			"exitmenu": false,
+			"refresh": false,
+			"internal": "status Writing screensaver diagnostics to /mnt/us/dashboard/screensaver-diag.log"
+		},
+		{
+			"name": "Prepare ld symlink (5.17+ fix)",
+			"priority": 2,
+			"action": "./bin/prepare-ldsymlink.sh",
+			"exitmenu": false,
+			"refresh": false,
+			"internal": "status Applying /lib/ld-linux.so.3 workaround if missing"
+		},
+		{
+			"name": "Remove ld symlink (rollback)",
+			"priority": 3,
+			"action": "./bin/remove-ldsymlink.sh",
+			"exitmenu": false,
+			"refresh": false,
+			"internal": "status Removing the /lib/ld-linux.so.3 workaround"
+		},
+		{
+			"name": "Test PNG format (eips)",
+			"priority": 4,
+			"action": "./bin/test-format.sh",
+			"exitmenu": false,
+			"refresh": false,
+			"internal": "status Testing board.png with the device renderer"
+		},
+		{
+			"name": "Refresh board from server",
+			"priority": 5,
+			"action": "./bin/refresh.sh",
+			"exitmenu": false,
+			"refresh": false,
+			"internal": "status Fetching board and installing as screensaver"
+		},
+		{
+			"name": "Set board as screensaver",
+			"priority": 6,
+			"action": "./bin/set-screensaver.sh",
+			"exitmenu": false,
+			"refresh": false,
+			"internal": "status Installing existing board.png as the screensaver"
+		}
+		]
+	}
+	]
+}

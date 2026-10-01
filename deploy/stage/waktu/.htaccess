@@ -1,0 +1,9 @@
+# Never cache the board. E-ink browsers cache images aggressively and would
+# otherwise keep showing a stale prayer time with no visible clue why.
+<IfModule mod_headers.c>
+  Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+</IfModule>
+
+Options -Indexes

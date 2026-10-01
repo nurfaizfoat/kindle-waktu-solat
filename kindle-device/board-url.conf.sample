@@ -1,0 +1,18 @@
+# Kindle prayer-times board - server URL configuration
+#
+# Copy this file to the Kindle as:
+#     /mnt/us/dashboard/board-url.conf
+# and edit BOARD_URL so it points at YOUR OWN deployment of the board server
+# (see the "Set up your own server" section of the repository README).
+#
+# The on-device scripts source this file as a POSIX sh fragment, so keep the
+# quotes and keep the assignment on one line. No other variables are required.
+#
+# Correct example:
+#     BOARD_URL="https://your-host.example/waktu/board.php"
+#
+# The value below is only a placeholder. The scripts treat this exact
+# placeholder as "not configured" and refuse to fetch anything until you
+# change it.
+
+BOARD_URL="https://example.com/waktu/board.php"

@@ -1,0 +1,17 @@
+# --- private / not for publication -------------------------------------------
+# Device backup: the owner's purchased Kindle books. Private and copyrighted.
+kindle-backup-*/
+
+# Third-party binaries and staging (KOReader, jailbreak tooling)
+koreader-staging/
+koreader-*.zip
+winterbreak-staging-*/
+
+# Local tooling artifacts
+.atl/
+
+# --- OS / editor noise -------------------------------------------------------
+.DS_Store
+Thumbs.db
+*~
+*.swp

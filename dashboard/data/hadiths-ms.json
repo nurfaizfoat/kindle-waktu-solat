@@ -1,0 +1,359 @@
+{
+  "schema_version": 1,
+  "language": "ms",
+  "text_type": "Petikan maksud hadis",
+  "source_checked_on": "2026-09-30",
+  "notes": "Terjemahan ringkas petikan maksud untuk paparan. Bukan teks penuh atau terjemahan Melayu rasmi. Rujuk pautan setiap entri untuk riwayat lengkap.",
+  "hadiths": [
+    {
+      "id": "bukhari-6018",
+      "topic": "Menjaga tutur kata",
+      "text": "Sesiapa yang beriman kepada Allah dan hari akhirat, hendaklah dia berkata baik atau diam.",
+      "source": "Sahih al-Bukhari · 6018",
+      "url": "https://sunnah.com/bukhari:6018"
+    },
+    {
+      "id": "bukhari-6464",
+      "topic": "Amalan berterusan",
+      "text": "Amalan yang paling dicintai Allah ialah amalan yang dilakukan secara berterusan walaupun sedikit.",
+      "source": "Sahih al-Bukhari · 6464",
+      "url": "https://sunnah.com/bukhari:6464"
+    },
+    {
+      "id": "muslim-2699a",
+      "topic": "Saling membantu",
+      "text": "Allah menolong seorang hamba selagi hamba itu menolong saudaranya.",
+      "source": "Sahih Muslim · 2699a",
+      "url": "https://sunnah.com/muslim:2699a"
+    },
+    {
+      "id": "bukhari-1",
+      "topic": "Niat yang baik",
+      "text": "Sesungguhnya amalan bergantung pada niat, dan setiap orang mendapat apa yang diniatkannya.",
+      "source": "Sahih al-Bukhari · 1",
+      "url": "https://sunnah.com/bukhari:1"
+    },
+    {
+      "id": "bukhari-6005",
+      "topic": "Menjaga anak yatim",
+      "text": "Aku dan penjaga anak yatim di syurga seperti dua jari ini: jari telunjuk dan jari tengah.",
+      "source": "Sahih al-Bukhari · 6005",
+      "url": "https://sunnah.com/bukhari:6005"
+    },
+    {
+      "id": "bukhari-12",
+      "topic": "Makanan dan salam",
+      "text": "Berilah makan dan ucapkan salam kepada orang yang kamu kenal dan yang tidak kamu kenal.",
+      "source": "Sahih al-Bukhari · 12",
+      "url": "https://sunnah.com/bukhari:12"
+    },
+    {
+      "id": "bukhari-6116",
+      "topic": "Nasihat ringkas",
+      "text": "Jangan marah.",
+      "source": "Sahih al-Bukhari · 6116",
+      "url": "https://sunnah.com/bukhari:6116"
+    },
+    {
+      "id": "bukhari-2320",
+      "topic": "Menanam kebaikan",
+      "text": "Tanaman seorang Muslim yang dimakan burung, manusia atau haiwan menjadi sedekah baginya.",
+      "source": "Sahih al-Bukhari · 2320",
+      "url": "https://sunnah.com/bukhari:2320"
+    },
+    {
+      "id": "bukhari-6133",
+      "topic": "Belajar daripada pengalaman",
+      "text": "Seorang mukmin tidak disengat dua kali dari lubang yang sama.",
+      "source": "Sahih al-Bukhari · 6133",
+      "url": "https://sunnah.com/bukhari:6133"
+    },
+    {
+      "id": "bukhari-6035",
+      "topic": "Akhlak yang baik",
+      "text": "Sebaik-baik kamu ialah orang yang paling baik akhlaknya.",
+      "source": "Sahih al-Bukhari · 6035",
+      "url": "https://sunnah.com/bukhari:6035"
+    },
+    {
+      "id": "bukhari-6412",
+      "topic": "Menghargai masa",
+      "text": "Dua nikmat yang ramai manusia rugi padanya ialah kesihatan dan masa lapang.",
+      "source": "Sahih al-Bukhari · 6412",
+      "url": "https://sunnah.com/bukhari:6412"
+    },
+    {
+      "id": "muslim-2626",
+      "topic": "Kebaikan kecil",
+      "text": "Jangan meremehkan sebarang kebaikan, walaupun sekadar bertemu saudaramu dengan wajah yang ceria.",
+      "source": "Sahih Muslim · 2626",
+      "url": "https://sunnah.com/muslim:2626"
+    },
+    {
+      "id": "muslim-91a",
+      "topic": "Menjauhi kesombongan",
+      "text": "Kesombongan ialah menolak kebenaran dan merendahkan orang lain.",
+      "source": "Sahih Muslim · 91a",
+      "url": "https://sunnah.com/muslim:91a"
+    },
+    {
+      "id": "bukhari-1469",
+      "topic": "Kesabaran",
+      "text": "Tiada pemberian yang lebih baik dan lebih luas daripada kesabaran.",
+      "source": "Sahih al-Bukhari · 1469",
+      "url": "https://sunnah.com/bukhari:1469"
+    },
+    {
+      "id": "muslim-1893a",
+      "topic": "Mengajak kepada kebaikan",
+      "text": "Sesiapa yang menunjukkan jalan kepada kebaikan mendapat pahala seperti orang yang melakukannya.",
+      "source": "Sahih Muslim · 1893a",
+      "url": "https://sunnah.com/muslim:1893a"
+    },
+    {
+      "id": "bukhari-5975",
+      "topic": "Mengelakkan pembaziran",
+      "text": "Allah tidak menyukai pembaziran harta.",
+      "source": "Sahih al-Bukhari · 5975",
+      "url": "https://sunnah.com/bukhari:5975"
+    },
+    {
+      "id": "bukhari-5351",
+      "topic": "Nafkah keluarga",
+      "text": "Apabila seorang Muslim menafkahi keluarganya dengan mengharapkan pahala Allah, nafkah itu menjadi sedekah baginya.",
+      "source": "Sahih al-Bukhari · 5351",
+      "url": "https://sunnah.com/bukhari:5351"
+    },
+    {
+      "id": "bukhari-6114",
+      "topic": "Mengawal kemarahan",
+      "text": "Orang yang kuat ialah orang yang dapat mengawal dirinya ketika marah.",
+      "source": "Sahih al-Bukhari · 6114",
+      "url": "https://sunnah.com/bukhari:6114"
+    },
+    {
+      "id": "bukhari-2444",
+      "topic": "Mencegah kezaliman",
+      "text": "Tolonglah saudaramu yang menzalimi dengan menghalangnya daripada melakukan kezaliman.",
+      "source": "Sahih al-Bukhari · 2444",
+      "url": "https://sunnah.com/bukhari:2444"
+    },
+    {
+      "id": "bukhari-52",
+      "topic": "Menjaga hati",
+      "text": "Dalam tubuh ada seketul daging; jika baik, baiklah seluruh tubuh. Ketahuilah, itulah hati.",
+      "source": "Sahih al-Bukhari · 52",
+      "url": "https://sunnah.com/bukhari:52"
+    },
+    {
+      "id": "bukhari-6013",
+      "topic": "Belas kasihan",
+      "text": "Sesiapa yang tidak mengasihani orang lain, dia tidak akan dikasihani.",
+      "source": "Sahih al-Bukhari · 6013",
+      "url": "https://sunnah.com/bukhari:6013"
+    },
+    {
+      "id": "bukhari-2087",
+      "topic": "Keberkatan perniagaan",
+      "text": "Sumpah boleh melariskan barang jualan, tetapi menghapuskan keberkatannya.",
+      "source": "Sahih al-Bukhari · 2087",
+      "url": "https://sunnah.com/bukhari:2087"
+    },
+    {
+      "id": "muslim-2594a",
+      "topic": "Berlemah lembut",
+      "text": "Kelembutan menghiasi sesuatu; apabila kelembutan dicabut daripadanya, ia menjadi buruk.",
+      "source": "Sahih Muslim · 2594a",
+      "url": "https://sunnah.com/muslim:2594a"
+    },
+    {
+      "id": "bukhari-6077",
+      "topic": "Memulakan perdamaian",
+      "text": "Antara dua orang yang saling menjauhkan diri, yang lebih baik ialah yang terlebih dahulu memberi salam.",
+      "source": "Sahih al-Bukhari · 6077",
+      "url": "https://sunnah.com/bukhari:6077"
+    },
+    {
+      "id": "bukhari-5641",
+      "topic": "Menghadapi kesusahan",
+      "text": "Tiada kesakitan atau kesedihan menimpa seorang Muslim, walaupun tertusuk duri, melainkan Allah menghapuskan sebahagian dosanya.",
+      "source": "Sahih al-Bukhari · 5641",
+      "url": "https://sunnah.com/bukhari:5641"
+    },
+    {
+      "id": "muslim-55a",
+      "topic": "Nasihat yang ikhlas",
+      "text": "Agama ialah nasihat: kepada Allah, kitab-Nya, rasul-Nya, para pemimpin Muslim dan seluruh umat Islam.",
+      "source": "Sahih Muslim · 55a",
+      "url": "https://sunnah.com/muslim:55a"
+    },
+    {
+      "id": "bukhari-5971",
+      "topic": "Berbakti kepada ibu",
+      "text": "Yang paling berhak mendapat layanan baikmu ialah ibumu, kemudian ibumu, kemudian ibumu, kemudian bapamu.",
+      "source": "Sahih al-Bukhari · 5971",
+      "url": "https://sunnah.com/bukhari:5971"
+    },
+    {
+      "id": "bukhari-660",
+      "topic": "Bersedekah secara rahsia",
+      "text": "Antara yang mendapat naungan Allah ialah orang yang bersedekah sehingga tangan kirinya tidak tahu apa yang diberikan tangan kanannya.",
+      "source": "Sahih al-Bukhari · 660",
+      "url": "https://sunnah.com/bukhari:660"
+    },
+    {
+      "id": "bukhari-10",
+      "topic": "Tidak menyakiti",
+      "text": "Seorang Muslim ialah orang yang kaum Muslimin selamat daripada gangguan lidah dan tangannya.",
+      "source": "Sahih al-Bukhari · 10",
+      "url": "https://sunnah.com/bukhari:10"
+    },
+    {
+      "id": "bukhari-2442",
+      "topic": "Persaudaraan",
+      "text": "Seorang Muslim ialah saudara Muslim yang lain; dia tidak menzaliminya dan tidak menyerahkannya kepada kezaliman.",
+      "source": "Sahih al-Bukhari · 2442",
+      "url": "https://sunnah.com/bukhari:2442"
+    },
+    {
+      "id": "bukhari-69",
+      "topic": "Memudahkan urusan",
+      "text": "Permudahkanlah dan jangan menyusahkan; berilah khabar gembira dan jangan membuat orang menjauh.",
+      "source": "Sahih al-Bukhari · 69",
+      "url": "https://sunnah.com/bukhari:69"
+    },
+    {
+      "id": "bukhari-6011",
+      "topic": "Saling menyayangi",
+      "text": "Orang beriman dalam kasih sayang dan belas kasihan sesama mereka adalah seperti satu tubuh.",
+      "source": "Sahih al-Bukhari · 6011",
+      "url": "https://sunnah.com/bukhari:6011"
+    },
+    {
+      "id": "bukhari-2076",
+      "topic": "Bertimbang rasa",
+      "text": "Semoga Allah merahmati orang yang bertimbang rasa ketika menjual, membeli dan menuntut haknya.",
+      "source": "Sahih al-Bukhari · 2076",
+      "url": "https://sunnah.com/bukhari:2076"
+    },
+    {
+      "id": "muslim-2588",
+      "topic": "Memaafkan",
+      "text": "Allah menambahkan kemuliaan kepada seorang hamba yang memaafkan orang lain.",
+      "source": "Sahih Muslim · 2588",
+      "url": "https://sunnah.com/muslim:2588"
+    },
+    {
+      "id": "bukhari-6064",
+      "topic": "Menjauhi sangkaan",
+      "text": "Jauhilah sangkaan buruk, kerana sangkaan buruk ialah percakapan yang paling dusta.",
+      "source": "Sahih al-Bukhari · 6064",
+      "url": "https://sunnah.com/bukhari:6064"
+    },
+    {
+      "id": "bukhari-6446",
+      "topic": "Kekayaan jiwa",
+      "text": "Kekayaan bukanlah banyaknya harta, tetapi kekayaan yang sebenar ialah kekayaan jiwa.",
+      "source": "Sahih al-Bukhari · 6446",
+      "url": "https://sunnah.com/bukhari:6446"
+    },
+    {
+      "id": "muslim-2999",
+      "topic": "Syukur dan sabar",
+      "text": "Mukmin bersyukur ketika senang dan bersabar ketika susah; kedua-duanya membawa kebaikan baginya.",
+      "source": "Sahih Muslim · 2999",
+      "url": "https://sunnah.com/muslim:2999"
+    },
+    {
+      "id": "bukhari-5991",
+      "topic": "Menyambung hubungan",
+      "text": "Penyambung silaturahim ialah orang yang tetap menyambung hubungan apabila hubungan dengannya diputuskan.",
+      "source": "Sahih al-Bukhari · 5991",
+      "url": "https://sunnah.com/bukhari:5991"
+    },
+    {
+      "id": "bukhari-2989",
+      "topic": "Menjaga jalan",
+      "text": "Membuang sesuatu yang memudaratkan dari jalan ialah sedekah.",
+      "source": "Sahih al-Bukhari · 2989",
+      "url": "https://sunnah.com/bukhari:2989"
+    },
+    {
+      "id": "bukhari-13",
+      "topic": "Mengasihi saudara",
+      "text": "Tidak sempurna iman seseorang sehingga dia mengasihi saudaranya sebagaimana dia mengasihi dirinya sendiri.",
+      "source": "Sahih al-Bukhari · 13",
+      "url": "https://sunnah.com/bukhari:13"
+    },
+    {
+      "id": "bukhari-6007",
+      "topic": "Membantu yang memerlukan",
+      "text": "Orang yang mengusahakan keperluan balu dan orang miskin adalah seperti orang yang berjihad di jalan Allah.",
+      "source": "Sahih al-Bukhari · 6007",
+      "url": "https://sunnah.com/bukhari:6007"
+    },
+    {
+      "id": "bukhari-33",
+      "topic": "Menjaga amanah",
+      "text": "Tanda orang munafik ada tiga: berdusta ketika bercakap, memungkiri janji dan mengkhianati amanah.",
+      "source": "Sahih al-Bukhari · 33",
+      "url": "https://sunnah.com/bukhari:33"
+    },
+    {
+      "id": "bukhari-6021",
+      "topic": "Kebaikan itu sedekah",
+      "text": "Setiap kebaikan ialah sedekah.",
+      "source": "Sahih al-Bukhari · 6021",
+      "url": "https://sunnah.com/bukhari:6021"
+    },
+    {
+      "id": "bukhari-2072",
+      "topic": "Usaha sendiri",
+      "text": "Tiada makanan yang lebih baik daripada makanan yang diperoleh melalui usaha tangannya sendiri.",
+      "source": "Sahih al-Bukhari · 2072",
+      "url": "https://sunnah.com/bukhari:2072"
+    },
+    {
+      "id": "muslim-2564c",
+      "topic": "Hati dan amalan",
+      "text": "Allah tidak melihat rupa dan hartamu, tetapi Dia melihat hati dan amalanmu.",
+      "source": "Sahih Muslim · 2564c",
+      "url": "https://sunnah.com/muslim:2564c"
+    },
+    {
+      "id": "bukhari-6094",
+      "topic": "Bercakap benar",
+      "text": "Kejujuran membawa kepada kebaikan, dan kebaikan membawa ke syurga.",
+      "source": "Sahih al-Bukhari · 6094",
+      "url": "https://sunnah.com/bukhari:6094"
+    },
+    {
+      "id": "bukhari-6416",
+      "topic": "Hidup sebagai musafir",
+      "text": "Jadilah engkau di dunia seperti orang asing atau seorang musafir.",
+      "source": "Sahih al-Bukhari · 6416",
+      "url": "https://sunnah.com/bukhari:6416"
+    },
+    {
+      "id": "muslim-2664",
+      "topic": "Berusaha dan memohon pertolongan",
+      "text": "Kejarlah perkara yang bermanfaat bagimu, mohonlah pertolongan Allah dan jangan lemah.",
+      "source": "Sahih Muslim · 2664",
+      "url": "https://sunnah.com/muslim:2664"
+    },
+    {
+      "id": "bukhari-5986",
+      "topic": "Menjaga silaturahim",
+      "text": "Sesiapa yang ingin diluaskan rezekinya dan dipanjangkan umurnya, hendaklah dia menyambung silaturahim.",
+      "source": "Sahih al-Bukhari · 5986",
+      "url": "https://sunnah.com/bukhari:5986"
+    },
+    {
+      "id": "bukhari-1417",
+      "topic": "Sedekah walaupun sedikit",
+      "text": "Lindungilah dirimu daripada api neraka walaupun dengan bersedekah separuh biji kurma.",
+      "source": "Sahih al-Bukhari · 1417",
+      "url": "https://sunnah.com/bukhari:1417"
+    }
+  ]
+}
