@@ -34,9 +34,6 @@ set -u
 # unreadable; it is checked and rejected further down.
 BOARD_URL="https://example.com/waktu/board.php"
 BOARD_URL_CONF="/mnt/us/dashboard/board-url.conf"
-if [ -r "$BOARD_URL_CONF" ]; then
-  . "$BOARD_URL_CONF"
-fi
 DIR=/mnt/us/dashboard
 IMG="$DIR/board.png"
 TMP="$DIR/board.png.$$.tmp"
@@ -44,6 +41,7 @@ LOG="$DIR/screensaver.log"
 LOCK="$DIR/refresh.lock"
 MAXBYTES=2097152
 BIN=$(cd "$(dirname "$0")" && pwd)
+CONV_TMP=""
 
 # --- /mnt/us must be a real mount, or we would fabricate a dead dashboard dir
 if ! awk '$2=="/mnt/us"{f=1} END{exit !f}' /proc/mounts 2>/dev/null; then
@@ -53,6 +51,12 @@ if ! awk '$2=="/mnt/us"{f=1} END{exit !f}' /proc/mounts 2>/dev/null; then
 fi
 
 mkdir -p "$DIR" 2>/dev/null
+
+# The URL config lives on the userstore, so it is read only once /mnt/us is
+# confirmed mounted; sourcing it before the guard could pick up a shadow file.
+if [ -r "$BOARD_URL_CONF" ]; then
+  . "$BOARD_URL_CONF"
+fi
 
 log() {
   _ts=$(date '+%Y-%m-%d %H:%M:%S')
@@ -73,10 +77,17 @@ if [ -z "${BOARD_URL:-}" ] || [ "$BOARD_URL" = "https://example.com/waktu/board.
 fi
 
 # --- single instance --------------------------------------------------------
-cleanup_lock() { rm -rf "$LOCK" 2>/dev/null; }
+cleanup_lock() {
+  rm -rf "$LOCK" 2>/dev/null
+  [ -n "${CONV_TMP:-}" ] && rm -f "$CONV_TMP" 2>/dev/null
+}
 if ! mkdir "$LOCK" 2>/dev/null; then
   _oldpid=$(cat "$LOCK/pid" 2>/dev/null)
-  if [ -n "${_oldpid:-}" ] && kill -0 "$_oldpid" 2>/dev/null; then
+  # A lock is only trusted when the PID is alive AND its cmdline still names
+  # refresh.sh. A live PID that does not match is a recycled PID, so the stale
+  # lock is removed and re-acquired once.
+  if [ -n "${_oldpid:-}" ] && kill -0 "$_oldpid" 2>/dev/null \
+     && grep -qa 'refresh\.sh' "/proc/$_oldpid/cmdline" 2>/dev/null; then
     log "REFUSING: another refresh is running (pid $_oldpid)."
     exit 9
   fi
@@ -138,12 +149,14 @@ for _c in /mnt/us/linkss/bin/convert /mnt/us/linkss/bin/mogrify; do
   if [ -f "$_c" ]; then CONV="$_c"; break; fi
 done
 
-# vfat keeps no execute bit, so run the binary from tmpfs.
+# vfat keeps no execute bit, so run the binary from tmpfs. A per-PID name avoids
+# two concurrent refreshes sharing (and clobbering) one predictable root temp.
 CONV_RUN=""
 if [ -n "$CONV" ]; then
-  if cp -f "$CONV" /tmp/linkss_convert 2>/dev/null; then
-    chmod 755 /tmp/linkss_convert 2>/dev/null
-    [ -x /tmp/linkss_convert ] && CONV_RUN=/tmp/linkss_convert
+  CONV_TMP="/tmp/linkss_convert.$$"
+  if cp -f "$CONV" "$CONV_TMP" 2>/dev/null; then
+    chmod 755 "$CONV_TMP" 2>/dev/null
+    [ -x "$CONV_TMP" ] && CONV_RUN="$CONV_TMP"
   fi
 fi
 

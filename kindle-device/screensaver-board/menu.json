@@ -51,6 +51,22 @@
 			"exitmenu": false,
 			"refresh": false,
 			"internal": "status Installing existing board.png as the screensaver"
+		},
+		{
+			"name": "Enable auto-refresh (boot)",
+			"priority": 7,
+			"action": "./bin/install-refresh-autostart.sh",
+			"exitmenu": false,
+			"refresh": false,
+			"internal": "status Installing the refresh-on-wake upstart job"
+		},
+		{
+			"name": "Disable auto-refresh (rollback)",
+			"priority": 8,
+			"action": "./bin/remove-refresh-autostart.sh",
+			"exitmenu": false,
+			"refresh": false,
+			"internal": "status Removing the refresh-on-wake upstart job"
 		}
 		]
 	}

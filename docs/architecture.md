@@ -89,16 +89,21 @@ them.
    `set-screensaver.sh`.
 9. **`set-screensaver.sh`** validates the PNG (magic, exact 1072x1448 from the
    IHDR), refuses if `/mnt/us/linkss` is absent (exit 2), installs to
-   `/mnt/us/linkss/screensavers/bg_large_ss00.png` atomically, and verifies the
+   `/mnt/us/linkss/screensavers/bg_ss00.png` atomically, and verifies the
    installed file.
 
-`set-screensaver.sh` derives the panel group from the panel size, not from
-whatever file is present: `EXPECTED_GROUP="large"`, the linkss size group for a
-1072x1448 PW3 panel. If a `bg_large_ss*.png` already exists it reuses that exact
-filename; otherwise it installs `bg_large_ss00.png`. It refuses to install a
-source that is not exactly 1072x1448 (fail closed) and, after install, verifies
-both the IHDR dimensions and that the filename's group token equals `large`
-(a `bg_medium_ss00.png` would be silently ignored by linkss on this panel).
+`set-screensaver.sh` always installs the FW >= 5.5 final filename
+`/mnt/us/linkss/screensavers/bg_ss00.png`, not the legacy
+`bg_<group>_ssNN.png`. On FW >= 5.5 linkss's `shuffless` names pool files
+`bg_ss00.png`, `bg_ss01.png`, ... (its `ss_prefix` is `bg_ss` for
+`K5_ATLEAST_55`); the legacy panel-group name is only the boot-time form that
+`shuffless` renames. After a verified install it calls the sourced helper
+`bin/lib-pool.sh::pool_quarantine_extras` to MOVE every other `*.png` in the pool
+into `/mnt/us/dashboard/screensaver-quarantine/` (recoverable, never deleted), so
+the pool holds exactly one file and no extras make linkss cycle. It refuses to
+install a source that is not exactly 1072x1448 (fail closed) and, after install,
+verifies both the IHDR dimensions and that the installed basename is exactly
+`bg_ss00.png` (exit 7 otherwise).
 
 ---
 
@@ -116,6 +121,10 @@ The screensaver route removes the contention instead of fighting it:
   `/mnt/us/linkss/screensavers/`. The linkss ScreenSavers hack supplies custom
   images to the framework's own sleep path; nothing takes over the framebuffer
   and nothing is painted by a competing process.
+- linkss **bind-mounts** `/mnt/us/linkss/screensavers` onto
+  `/usr/share/blanket/screensaver`, so the framework reads the pool file live
+  from the userstore. Replacing the correctly-named `bg_ssNN.png` is therefore
+  visible at the next sleep with no restart.
 - The framework's sleep screen is drawn by **libblanket**, which renders the
   screensaver full-screen with **no status chrome** (no clock/battery bar). That
   is why the board appears clean. (The libblanket implementation itself is
@@ -185,45 +194,101 @@ leaves the previous good board in place, and points at `to-png8.py` /
 `eips` shares the framebuffer path the screensaver engine uses, so a success in
 this gate is strong evidence the file is safe before anything is installed.
 
-### 3.3 Why the panel group matters
+### 3.3 Why the final filename matters
 
-The linkss filename token is `bg_<group>_ss<NN>.png` and the group is
-panel-size dependent. Because the source is hard-gated to 1072x1448, the
-expected group is `large` for a PW3. `set-screensaver.sh`:
+On FW >= 5.5 the linkss `shuffless` names pool files `bg_ss00.png`,
+`bg_ss01.png`, ... (its `ss_prefix` is `bg_ss` for `K5_ATLEAST_55`). The legacy
+`bg_<group>_ss<NN>.png` token (for example `bg_large_ss00.png`) is only the
+boot-time form: `shuffless` renames it to `bg_ssNN.png` when it runs at boot. So
+writing the legacy name takes effect only after a reboot, while writing the final
+name `bg_ss00.png` is read live at the next sleep. `set-screensaver.sh`:
 
-- reuses an existing `bg_large_ss*.png` by exact filename rather than creating a
-  duplicate (duplicates make linkss cycle between images);
-- warns about `bg_*_ss*.png` files for other groups and never lets them drive
-  the name choice;
-- warns about any other `bg_*.png` extras and leaves them alone.
+- always installs exactly `/mnt/us/linkss/screensavers/bg_ss00.png`;
+- after a verified install, calls `pool_quarantine_extras` from the sourced
+  `bin/lib-pool.sh` to MOVE every other `*.png` in the pool into
+  `/mnt/us/dashboard/screensaver-quarantine/` (a name collision gets a `.$$`
+  suffix), so the pool holds exactly one file;
+- never deletes a pool file: quarantine is recoverable by moving a file back by
+  hand, and a failed move is logged as a WARNING that the pool may still cycle.
+
+### 3.4 Live updates: the refresh daemon and the upstart autostart
+
+Refreshing used to require tapping a library scriptlet. `bin/refresh-daemon.sh`
+keeps the board current without a tap:
+
+- It is installed as an upstart job, `/etc/init/screensaver-board-refresh.conf`,
+  by `bin/install-refresh-autostart.sh` (inside a guarded `mntroot rw`/`ro`
+  block). The job is `start on started framework` / `stop on stopping framework`
+  when `/etc/init/framework.conf` exists, else `lab126_gui` when
+  `/etc/init/lab126_gui.conf` exists, else `start on runlevel [2345]` with no
+  stop line (with a logged WARNING). It declares `respawn`,
+  `respawn limit 10 300`, `kill timeout 30` (so the daemon's trap can run on
+  stop) and runs
+  `exec /bin/sh /mnt/us/extensions/screensaver-board/bin/refresh-daemon.sh`.
+- The daemon refreshes once after a 10s settle, then loops in **sliced** waits of
+  at most 10s each (`lipc-wait-event -s 10 com.lab126.powerd
+  wakeupFromSuspend`), classifying each return as a wake event or a timeout by
+  how quickly it returned (clock-jump safe). It refreshes on a wake event with a
+  60s debounce and otherwise at least every 3600s while awake. Repeated
+  sub-2s returns are treated as a broken `lipc-wait-event` and it falls back to
+  the sleep-based hourly timer. The short slices keep the loop responsive to
+  INT/TERM/HUP and let it re-check the `/mnt/us` mount each cycle.
+- If `/mnt/us` is not mounted the daemon waits 60s and retries rather than
+  exiting, so an upstart respawn cannot burn its budget while the userstore is
+  unmounted.
+- Each cycle calls `refresh.sh` up to 3 times, 20s apart, wrapped in
+  `timeout 300` when available; exit 8 (board URL not configured) is permanent
+  and is not retried. The loop never aborts: a failed refresh keeps the previous
+  board (`refresh.sh` preserves it).
+- `refresh-daemon.log` and `screensaver.log` are rotated to `<file>.1` once they
+  exceed 256 KiB.
+- While the device is **asleep** no process runs, so the visible board is as
+  fresh as the last refresh before sleep. The daemon refreshes as soon as the
+  device wakes.
+- It is single-instance (a `refresh-daemon.lock` directory holding a PID, backed
+  by `refresh-daemon.pid`, with a live-PID plus cmdline check) and it never stops
+  or touches the framework. `bin/remove-refresh-autostart.sh` is the rollback: it
+  stops the upstart job first, then the daemon, then removes the job file inside
+  the same guarded rootfs block.
+
+Because linkss bind-mounts the pool onto `/usr/share/blanket/screensaver`, the
+replacement of an already-correctly-named `bg_ss00.png` is read at the next sleep
+without a framework restart. The restart/reboot requirement applies to the
+**first install**, when `shuffless` must run to name the pool files.
 
 ---
 
 ## 4. Safety invariants
 
-These are enforced across `refresh.sh`, `set-screensaver.sh`,
-`prepare-ldsymlink.sh` and `remove-ldsymlink.sh`.
+These are enforced across `refresh.sh`, `set-screensaver.sh`, `lib-pool.sh`,
+`prepare-ldsymlink.sh`, `remove-ldsymlink.sh`, `refresh-daemon.sh`,
+`install-refresh-autostart.sh` and `remove-refresh-autostart.sh`.
 
-1. **Never delete files it does not own.** `set-screensaver.sh` collects any
-   `bg_*.png` other than its destination into `EXTRAS` and only **warns**; it
-   never removes them. The bundle README states the same rule.
+1. **Never delete files it does not own.** `set-screensaver.sh` installs
+   `bg_ss00.png` and then moves every other `*.png` in the pool to
+   `/mnt/us/dashboard/screensaver-quarantine/` via `lib-pool.sh`; nothing is
+   deleted and quarantined files can be restored by hand. A failed move is only a
+   logged WARNING. The bundle README states the same rule.
 2. **Back up before overwrite.**
    - `refresh.sh` copies `board.png` to `board.png.bak` immediately before
      replacing it, and aborts if the backup fails.
    - `set-screensaver.sh` copies the existing destination to `<dest>.bak` once
      (the backup is kept, not refreshed, so it always holds the file that was
      there first).
-3. **Single-instance lock.** Both `refresh.sh` (`.lock`/`pid`) and
-   `set-screensaver.sh` (`set-screensaver.lock`/`pid`) use an atomic `mkdir`
-   lock with a live-PID check, so two library taps cannot race.
+3. **Single-instance.** `refresh.sh` (`.lock`/`pid`) and `set-screensaver.sh`
+   (`set-screensaver.lock`/`pid`) use an atomic `mkdir` lock with a live-PID
+   check, so two library taps cannot race. `refresh-daemon.sh` uses a pidfile
+   whose PID must be alive **and** whose `/proc/<pid>/cmdline` still names
+   `refresh-daemon.sh`, so a stale pidfile is replaced.
 4. **Preserve the last-known-good board.** A failed fetch or a failed gate
    leaves `board.png` untouched and exits non-zero. Temporary files use the
    `$$` PID suffix and are cleaned up.
-5. **Always return the rootfs to read-only.** `prepare-ldsymlink.sh` and
-   `remove-ldsymlink.sh` are the only scripts that write to the rootfs, and only
-   inside a guarded `mntroot rw` / `mntroot ro` block. The writable flag is set
-   **before** `mntroot rw`, so the `EXIT` trap always attempts a restore; after
-   `mntroot ro` the state is verified against `/proc/mounts` and the script
+5. **Always return the rootfs to read-only.** `prepare-ldsymlink.sh`,
+   `remove-ldsymlink.sh`, `install-refresh-autostart.sh` and
+   `remove-refresh-autostart.sh` are the only scripts that write to the rootfs,
+   and only inside a guarded `mntroot rw` / `mntroot ro` block. The writable flag
+   is set **before** `mntroot rw`, so the `EXIT` trap always attempts a restore;
+   after `mntroot ro` the state is verified against `/proc/mounts` and the script
    exits non-zero (7) with a "reboot" message if it is still `rw`. Signal traps
    (`INT TERM HUP`) run the same restore.
 6. **Fail closed on the symlink.** `prepare-ldsymlink.sh` refuses to create a
@@ -238,7 +303,11 @@ These are enforced across `refresh.sh`, `set-screensaver.sh`,
    would never read only masks the real problem.
 8. **No framework interference.** The screensaver scripts write only under
    `/mnt/us/dashboard` and the linkss screensaver path. They never stop the
-   framework and never touch the running legacy dashboard.
+   framework and never touch the running legacy dashboard. The refresh daemon
+   only calls `refresh.sh`; it never stops or restarts the framework.
+9. **Failed refresh keeps the previous board.** `refresh.sh` leaves the previous
+   `board.png`/pool file in place on a fetch, normalise or gate failure, and the
+   daemon retries without ever aborting its loop.
 
 ---
 
@@ -255,8 +324,8 @@ launcher available is **library scriptlets**: a `.sh` file placed in
 ```
 
 The Kindle shows that file in the library as a tappable "book". Tapping it runs
-the script. The bundle ships five scriptlets
-(`documents/ssb-1-diagnose.sh` to `documents/ssb-5-install-linkss.sh`); each one:
+the script. The bundle ships seven scriptlets
+(`documents/ssb-1-diagnose.sh` to `documents/ssb-7-autostart-off.sh`); each one:
 
 - checks that its target `bin/` script exists and prints a clear message
   (`Bundle not found on this Kindle.` + the expected path) if the bundle has not
@@ -283,6 +352,13 @@ missing, if `/mnt/us/mrpackages` is missing, or if the package folder is empty.
 MRPI normally reboots the device when it finishes, so the on-screen summary may
 be cut short.
 
+`ssb-6-autostart-on.sh` and `ssb-7-autostart-off.sh` call
+`bin/install-refresh-autostart.sh` and `bin/remove-refresh-autostart.sh`, which
+install/remove the `screensaver-board-refresh` upstart job described in section
+3.4. Each has its own numbered icon (`ssb-6-autostart-on.png`,
+`ssb-7-autostart-off.png`), so the library shows distinct thumbnails for all
+seven entries.
+
 ### The secondary KUAL route
 
 The bundle also carries `config.xml` + `menu.json` (KUAL 2.x). It is **not
@@ -290,7 +366,8 @@ usable on this device as-is** and is kept only so the same bundle works if a
 launcher (KUAL or a Mesquito helper) is installed later. Its menu mirrors the
 scriptlets and adds two actions that have no library entry on this device:
 **Test PNG format (eips)** (`bin/test-format.sh`) and **Set board as
-screensaver** (`bin/set-screensaver.sh`).
+screensaver** (`bin/set-screensaver.sh`); it also carries **Enable auto-refresh
+(boot)** and **Disable auto-refresh (rollback)** for the upstart job.
 
 ---
 
@@ -330,6 +407,15 @@ the screensaver route superseded it.
 - The internals of the **linkss** hack (how it selects and cycles
   screensaver files, and its exact handling of files in a non-matching panel
   group).
+- The **live-read assumption**: that replacing an already-correctly-named
+  `bg_ss00.png` in the bind-mounted pool is picked up at the next sleep without
+  a restart. This is inferred from linkss bind-mounting
+  `/mnt/us/linkss/screensavers` onto `/usr/share/blanket/screensaver` plus its
+  FW >= 5.5 `bg_ss` prefix logic, not from reading the linkss source here.
+- The **upstart job-name detection heuristic**: `/etc/init/framework.conf` ->
+  `framework`, else `/etc/init/lab126_gui.conf` -> `lab126_gui`. A different
+  firmware may name its main job something else; the runlevel fallback avoids a
+  hard dependency but has not been exercised on this device.
 - The exact **cost in seconds** of the on-device ImageMagick conversion.
 - The **MRInstaller log filename**: `ssb-5` says only "Check its log under
   `$MRPI/log/`". The conventional filename `mrinstaller.log` is used in the

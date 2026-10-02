@@ -5,21 +5,27 @@
 # WHY THIS EXISTS
 #   The linkss ScreenSavers hack reads custom images from
 #   /mnt/us/linkss/screensavers/. Placing a single file named
-#   bg_<group>_ss00.png there makes closing the lid show that image and opening
-#   the lid return to reading - the native sleep path, with no framebuffer
-#   takeover and no clock/battery chrome drawn over the board.
+#   bg_ss00.png there makes closing the lid show that image and opening the lid
+#   return to reading - the native sleep path, with no framebuffer takeover and
+#   no clock/battery chrome drawn over the board.
 #
 # WHY EXACTLY ONE FILE
 #   With several bg_* files present, linkss cycles through them, which makes the
-#   board appear on some sleeps and not others. This script NEVER deletes files
-#   it does not own: if extras exist it WARNs and leaves them alone.
+#   board appear on some sleeps and not others. This script ALWAYS installs the
+#   final name bg_ss00.png, then MOVES every other *.png in the pool into
+#   /mnt/us/dashboard/screensaver-quarantine (recoverable, never deleted), so the
+#   pool ends with exactly one file.
 #
-# PANEL GROUP
-#   The bg_<group>_ss<NN> token is panel-size dependent. Because the source image
-#   is hard-gated to 1072x1448, the expected group is derived from the panel:
-#   "large" for a PW3. An existing bg_large_ss*.png is reused by exact filename,
-#   otherwise bg_large_ss00.png is installed. Files for any other group are
-#   ignored by linkss and are reported as a warning, never used to pick a name.
+# FINAL-FILE NAME (FW >= 5.5)
+#   On firmware 5.5 and newer, linkss's shuffless names pool files
+#   bg_ss00.png, bg_ss01.png, ... (its ss_prefix is "bg_ss" for K5_ATLEAST_55).
+#   A legacy bg_<group>_ss00.png is only renamed to bg_ss00.png by shuffless at
+#   boot, so writing it takes effect only after a reboot. To be read live at the
+#   next sleep, the pool file must already carry the final name bg_ss00.png.
+#   This script always targets bg_ss00.png directly and quarantines any extras.
+#   linkss bind-mounts /mnt/us/linkss/screensavers onto
+#   /usr/share/blanket/screensaver, so replacing the correctly-named file is
+#   picked up at the next sleep without a framework restart.
 #
 # SAFETY
 #   - Refuses to run if /mnt/us is not a mounted filesystem, and refuses if
@@ -31,7 +37,8 @@
 #     never replace a good screensaver.
 #   - A single-instance pidfile guards against two KUAL taps racing.
 #   - Verifies the installed file exists, is non-empty, and has 1072x1448 IHDR.
-#   - Writes only /mnt/us/dashboard/screensaver.log and the linkss screensaver.
+#   - Writes only /mnt/us/dashboard (log + quarantine), and the linkss
+#     screensaver pool.
 #
 # Usage: set-screensaver.sh [png-path]  (default /mnt/us/dashboard/board.png)
 # Log:   /mnt/us/dashboard/screensaver.log
@@ -44,6 +51,8 @@ LINKS=/mnt/us/linkss
 SSDIR=/mnt/us/linkss/screensavers
 SRC="${1:-/mnt/us/dashboard/board.png}"
 LOCK="$DIR/set-screensaver.lock"
+QUARANTINE="$DIR/screensaver-quarantine"
+BIN=$(cd "$(dirname "$0")" && pwd)
 
 # --- /mnt/us must be a real mount, or we would fabricate a dead dashboard dir
 if ! awk '$2=="/mnt/us"{f=1} END{exit !f}' /proc/mounts 2>/dev/null; then
@@ -60,11 +69,22 @@ log() {
   echo "$_ts $*" >> "$LOG"
 }
 
+# --- shared pool helper (sourced, not executed) -----------------------------
+if [ ! -f "$BIN/lib-pool.sh" ]; then
+  log "FAIL: lib-pool.sh is missing next to this script ($BIN)."
+  exit 2
+fi
+. "$BIN/lib-pool.sh"
+
 # --- single instance --------------------------------------------------------
 cleanup_lock() { rm -rf "$LOCK" 2>/dev/null; }
 if ! mkdir "$LOCK" 2>/dev/null; then
   _oldpid=$(cat "$LOCK/pid" 2>/dev/null)
-  if [ -n "${_oldpid:-}" ] && kill -0 "$_oldpid" 2>/dev/null; then
+  # A lock is only trusted when the PID is alive AND its cmdline still names
+  # set-screensaver.sh. A live PID that does not match is a recycled PID, so the
+  # stale lock is removed and re-acquired once.
+  if [ -n "${_oldpid:-}" ] && kill -0 "$_oldpid" 2>/dev/null \
+     && grep -qa 'set-screensaver\.sh' "/proc/$_oldpid/cmdline" 2>/dev/null; then
     log "REFUSING: another set-screensaver is running (pid $_oldpid)."
     exit 9
   fi
@@ -120,66 +140,14 @@ if ! mkdir -p "$SSDIR"; then
   exit 3
 fi
 
-# --- choose the panel group -------------------------------------------------
-# The expected group is derived from the panel size, not from whatever bg_*
-# file happens to be present: a 1072x1448 (PW3) panel uses linkss group "large".
-EXPECTED_GROUP="large"
-
-GROUP="$EXPECTED_GROUP"
-GROUP_SRC=""
-
-# Reuse an existing bg_large_ss*.png verbatim if one is present, so we do not
-# create a duplicate that would make linkss cycle between images.
-for f in "$SSDIR"/bg_"$EXPECTED_GROUP"_ss*.png; do
-  [ -e "$f" ] || continue
-  GROUP_SRC="$f"
-  break
-done
-
-if [ -n "$GROUP_SRC" ]; then
-  DEST="$GROUP_SRC"
-  log "panel group '$EXPECTED_GROUP' reused from existing file: $GROUP_SRC"
-else
-  DEST="$SSDIR/bg_${EXPECTED_GROUP}_ss00.png"
-  log "no existing bg_${EXPECTED_GROUP}_ss*.png found; installing $DEST"
-  log "(the 1072x1448 PW3 panel uses the linkss group '$EXPECTED_GROUP')."
-fi
-
-# Warn about files belonging to a different (wrong) panel group: linkss ignores
-# them for this panel, and they must never drive the group choice.
-OTHER_GROUP=""
-for f in "$SSDIR"/bg_*_ss*.png; do
-  [ -e "$f" ] || continue
-  [ "$f" = "$DEST" ] && continue
-  _b=${f##*/}
-  _g=${_b#bg_}
-  _g=${_g%%_ss*}
-  [ "$_g" = "$EXPECTED_GROUP" ] && continue
-  OTHER_GROUP="$OTHER_GROUP $f"
-done
-if [ -n "$OTHER_GROUP" ]; then
-  log "WARNING: screensaver files for a DIFFERENT panel group exist and will be IGNORED:"
-  for f in $OTHER_GROUP; do log "    $f"; done
-  log "WARNING: linkss only reads the '$EXPECTED_GROUP' group on this 1072x1448 panel."
-  log "The group is derived from panel size; these files belong to another panel."
-fi
-
-# --- NEVER delete files we do not own; warn about extras --------------------
-EXTRAS=""
-for f in "$SSDIR"/bg_*.png; do
-  [ -e "$f" ] || continue
-  [ "$f" = "$DEST" ] && continue
-  EXTRAS="$EXTRAS $f"
-done
-if [ -n "$EXTRAS" ]; then
-  log "WARNING: other screensaver files exist and are NOT managed by this bundle:"
-  for f in $EXTRAS; do log "    $f"; done
-  log "WARNING: extras can cause unpredictable cycling in linkss."
-  log "Remove them manually if you want exactly one screensaver."
-fi
+# --- destination is ALWAYS the FW >= 5.5 final name -------------------------
+# linkss reads bg_ssNN.png live from the bind-mounted pool; bg_ss00.png is the
+# single file this bundle owns. Any other *.png is quarantined after install.
+DEST="$SSDIR/bg_ss00.png"
+log "destination screensaver: $DEST"
 
 # --- install atomically -----------------------------------------------------
-TMP="$SSDIR/.bg_${GROUP}_ss00.$$.tmp"
+TMP="$SSDIR/.bg_ss_install.$$.tmp"
 rm -f "$TMP"
 if ! cp "$SRC" "$TMP"; then
   log "FAIL: copy to temp file failed"
@@ -218,16 +186,18 @@ if [ "$VDIMS" != "1072x1448" ]; then
   exit 6
 fi
 
-# The filename group token must equal the expected group, or linkss silently
-# ignores the file (e.g. bg_medium_ss00.png on a 1072x1448 PW3).
+# The installed basename must be exactly bg_ss00.png (the FW >= 5.5 final name),
+# or linkss silently ignores the file.
 INSTALLED_BASE=${DEST##*/}
-INSTALLED_GROUP=${INSTALLED_BASE#bg_}
-INSTALLED_GROUP=${INSTALLED_GROUP%%_ss*}
-if [ "$INSTALLED_GROUP" != "$EXPECTED_GROUP" ]; then
-  log "ERROR: installed filename group is '$INSTALLED_GROUP', expected '$EXPECTED_GROUP'."
-  log "linkss would ignore '$INSTALLED_BASE' on this 1072x1448 panel."
+if [ "$INSTALLED_BASE" != "bg_ss00.png" ]; then
+  log "ERROR: installed filename '$INSTALLED_BASE' is not bg_ss00.png."
+  log "linkss reads bg_ssNN.png from the bind-mounted pool; a wrong name would be ignored."
   exit 7
 fi
+
+# The install is verified: quarantine every OTHER *.png so the pool holds exactly
+# one file. Files are moved, never deleted.
+pool_quarantine_extras "$SSDIR" "$DEST" "$QUARANTINE"
 
 SIZE=$(wc -c < "$DEST" 2>/dev/null)
 log "installed: $DEST (${SIZE:-?} bytes, IHDR ${VDIMS})"

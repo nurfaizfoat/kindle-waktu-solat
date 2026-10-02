@@ -120,6 +120,49 @@ else
   echo "(missing: /lib/ld-linux-armhf.so.3 does not exist)"
 fi
 
+section "auto-refresh (screensaver-board-refresh)"
+if [ -r /etc/init/screensaver-board-refresh.conf ]; then
+  echo "-- /etc/init/screensaver-board-refresh.conf --"
+  cat /etc/init/screensaver-board-refresh.conf 2>&1
+else
+  echo "(missing: /etc/init/screensaver-board-refresh.conf - auto-refresh not installed)"
+fi
+if command -v initctl >/dev/null 2>&1; then
+  echo "-- initctl status screensaver-board-refresh --"
+  initctl status screensaver-board-refresh 2>&1 || echo "(status query failed)"
+else
+  echo "(initctl not present)"
+fi
+echo "-- refresh-daemon pidfile --"
+if [ -f /mnt/us/dashboard/refresh-daemon.pid ]; then
+  _dpid=$(cat /mnt/us/dashboard/refresh-daemon.pid 2>/dev/null)
+  echo "pidfile pid: ${_dpid:-unknown}"
+  if [ -n "${_dpid:-}" ] && kill -0 "$_dpid" 2>/dev/null; then
+    echo "pid $_dpid is alive"
+    if grep -qa 'refresh-daemon\.sh' "/proc/$_dpid/cmdline" 2>/dev/null; then
+      echo "cmdline matches refresh-daemon.sh"
+    else
+      echo "cmdline does NOT match refresh-daemon.sh"
+    fi
+  else
+    echo "pid is not alive (stale pidfile)"
+  fi
+else
+  echo "(no refresh-daemon pidfile - daemon not running)"
+fi
+echo "-- last 20 lines of /mnt/us/dashboard/refresh-daemon.log --"
+if [ -r /mnt/us/dashboard/refresh-daemon.log ]; then
+  tail -n 20 /mnt/us/dashboard/refresh-daemon.log 2>&1
+else
+  echo "(no refresh-daemon.log)"
+fi
+echo "-- board-url.conf --"
+if [ -e /mnt/us/dashboard/board-url.conf ]; then
+  echo "present: /mnt/us/dashboard/board-url.conf (contents intentionally not printed)"
+else
+  echo "(missing: /mnt/us/dashboard/board-url.conf)"
+fi
+
 section "end"
 echo "diagnostics written to $LOG"
 

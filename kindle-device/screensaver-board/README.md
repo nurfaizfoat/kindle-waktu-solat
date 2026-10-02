@@ -37,7 +37,7 @@ is **library scriptlets**: a `.sh` file in `/mnt/us/documents/` whose header has
 `# Name:`, `# Author:` and `# Icon:`. The Kindle shows it in the library as a
 tappable book.
 
-That is why this bundle ships four library entries. **Tap them in numeric
+That is why this bundle ships seven library entries. **Tap them in numeric
 order.** Each one prints a short summary on the device screen (exit code, a
 plain-English verdict, and the log path), so you can read the result without a
 PC. The scriptlets deliberately do **not** carry a `# DontUseFBInk` line, so the
@@ -49,6 +49,9 @@ on-screen output is visible.
 | **SS Board 2 Install Board** | `bin/refresh.sh` (fetch, gate, install) | `/mnt/us/dashboard/screensaver.log` |
 | **SS Board 3 Firmware Fix** | `bin/prepare-ldsymlink.sh` (5.17+ workaround) | `/mnt/us/dashboard/screensaver.log` |
 | **SS Board 4 Undo Firmware Fix** | `bin/remove-ldsymlink.sh` (rollback) | `/mnt/us/dashboard/screensaver.log` |
+| **SS Board 5 Install LinksS** | runs MRPI `./bin/mrinstaller.sh launch_installer` | `/mnt/us/extensions/MRInstaller/log/` |
+| **SS Board 6 Auto-Refresh On** | `bin/install-refresh-autostart.sh` (upstart job) | `/mnt/us/dashboard/screensaver.log` |
+| **SS Board 7 Auto-Refresh Off** | `bin/remove-refresh-autostart.sh` (rollback) | `/mnt/us/dashboard/screensaver.log` |
 
 ---
 
@@ -65,23 +68,38 @@ screensaver-board/
   bin/prepare-ldsymlink.sh   5.17+ workaround; guarded mntroot rw/ro
   bin/remove-ldsymlink.sh    rollback of that workaround; guarded mntroot rw/ro
   bin/test-format.sh         draws the PNG with /usr/sbin/eips (cheap gate)
-  bin/set-screensaver.sh     installs exactly ONE screensaver under /mnt/us/linkss
+  bin/set-screensaver.sh     installs exactly ONE screensaver (bg_ss00.png)
+  bin/lib-pool.sh            SOURCED helper: quarantine non-bg_ss00.png pool files
   bin/refresh.sh             fetch board -> gate -> set screensaver
+  bin/refresh-daemon.sh      refresh on wake + at least hourly while awake
+  bin/install-refresh-autostart.sh  install the upstart job; guarded mntroot rw/ro
+  bin/remove-refresh-autostart.sh   rollback the upstart job; guarded mntroot rw/ro
   bin/to-png8.py             HOST-SIDE re-encode to a clean 8-bit PNG (PC only)
   documents/                 library scriptlet launchers -> /mnt/us/documents/
     ssb-1-diagnose.sh
     ssb-2-install.sh
     ssb-3-fix-ld.sh
     ssb-4-undo-ld.sh
+    ssb-5-install-linkss.sh
+    ssb-6-autostart-on.sh
+    ssb-7-autostart-off.sh
   icons/                     library thumbnails      -> /mnt/us/dashboard/
     ssb-1-diagnose.png
     ssb-2-install.png
     ssb-3-fix-ld.png
     ssb-4-undo-ld.png
+    ssb-5-install-linkss.png
+    ssb-6-autostart-on.png
+    ssb-7-autostart-off.png
+  tests/                     HOST-ONLY test harness (never deployed)
+    run.sh
+    test-pool.sh
 ```
 
 Shared log: `/mnt/us/dashboard/screensaver.log`
+Daemon log: `/mnt/us/dashboard/refresh-daemon.log` (rotated to `.1` past 256 KiB)
 Diagnostic log: `/mnt/us/dashboard/screensaver-diag.log`
+Quarantine dir: `/mnt/us/dashboard/screensaver-quarantine/` (pool extras, recoverable)
 
 Copy the bundle to the device over USB:
 
@@ -90,9 +108,11 @@ Copy the bundle to the device over USB:
 3. `icons/*.png` -> `/mnt/us/dashboard/`
 
 The icons are already what the `# Icon:` lines point at
-(`/mnt/us/dashboard/ssb-*.png`), so the library entries show four distinct
-thumbnails. You may need to let the Kindle rescan the library (or reboot) before
-the entries appear.
+(`/mnt/us/dashboard/ssb-*.png`), so each of the seven library entries shows its
+own numbered thumbnail (`ssb-1-diagnose.png` ... `ssb-7-autostart-off.png`). You
+may need to let the Kindle rescan the library (or reboot) before new entries
+appear; a library entry whose `# Icon:` file is missing or shared with another
+entry can fail to show.
 
 ---
 
@@ -133,12 +153,16 @@ run the on-device format test:
 3. Read `/mnt/us/dashboard/screensaver.log`. You want `PASS: device renderer
    accepted the PNG (eips exit 0)`. If it fails, do **not** continue.
 
-> Note: the `bg_<group>_ss<NN>` filename is panel-size dependent. `set-screensaver.sh`
-> **detects** the group already present in `/mnt/us/linkss/screensavers`
-> (e.g. `large` or `medium`) and reuses it; if none exists it falls back to
-> `large`, which is the group for this 1072x1448 (PW3) panel. The chosen group
-> is written to the log. If the board is scaled or cropped, revisit the file's
-> size group in the linkss documentation.
+> Note: on firmware 5.5 and newer, linkss's `shuffless` names pool files
+> `bg_ss00.png`, `bg_ss01.png`, ... (its `ss_prefix` is `bg_ss`). The older
+> `bg_<group>_ss<NN>` name (for example `bg_large_ss00.png`) is only the
+> boot-time form that `shuffless` renames. `set-screensaver.sh` therefore
+> installs the **final** name `bg_ss00.png` directly, so a refresh is read live
+> at the next sleep without a framework restart. After a verified install it
+> MOVES every other `*.png` in the pool to
+> `/mnt/us/dashboard/screensaver-quarantine/` (recoverable, never deleted), so
+> the pool ends with exactly one file. The destination filename is written to
+> the log.
 
 ### Step 2 - Install the ScreenSavers (linkss) hack
 
@@ -211,8 +235,8 @@ untouched instead of being silently accepted. Verify from the diagnostic log
 
 Tap **SS Board 2 Install Board**. It fetches the latest board into a temp file,
 tests it with the device renderer, and only then replaces `board.png` and
-installs it under `/mnt/us/linkss/screensavers/` (named `bg_<group>_ss00.png`,
-group auto-detected as described in Step 1). A failed fetch or a failed format
+installs it under `/mnt/us/linkss/screensavers/` (named `bg_ss00.png`, the
+FW >= 5.5 final name, as described in Step 1). A failed fetch or a failed format
 gate leaves the previous good board untouched.
 
 If you prefer to install an existing local board without fetching, use the
@@ -221,11 +245,18 @@ secondary KUAL action **Set board as screensaver** (see below).
 Both routes refuse to run if `/mnt/us` is not mounted or if `/mnt/us/linkss` is
 missing, and say so clearly. Before the first overwrite of an existing
 destination, a backup is written to `<dest>.bak` (the backup is kept, not
-refreshed, so it always holds the file that was there first).
+refreshed, so it always holds the file that was there first). After the install
+is verified, every other `*.png` in the pool is moved to
+`/mnt/us/dashboard/screensaver-quarantine/` (recoverable, never deleted) so the
+pool holds exactly one screensaver.
 
-> **After changing the screensaver file the framework must be restarted, or the
-> device fully rebooted, before linkss picks up the new pool.** NiLuJe's
-> guidance is that the device must be **unplugged from USB while rebooting**.
+> **The restart/reboot note applies to the FIRST install, not to every refresh.**
+> On the first install `shuffless` must run so linkss names the pool files. But
+> linkss bind-mounts `/mnt/us/linkss/screensavers` onto
+> `/usr/share/blanket/screensaver`, so once the pool file is correctly named
+> `bg_ssNN.png`, replacing its contents is read at the **next sleep** with no
+> framework restart. After the first install, reboot unplugged; afterwards a
+> refresh needs no reboot.
 
 ### Step 6 - Verify
 
@@ -239,10 +270,15 @@ a running dashboard will suppress the native screensaver.
 ### Step 7 - Rollback
 
 - **Remove just the custom board:** delete the installed
-  `/mnt/us/linkss/screensavers/bg_<group>_ss00.png` and reboot. If a
-  `bg_<group>_ss00.png.bak` exists, restore it first
-  (`mv bg_<group>_ss00.png.bak bg_<group>_ss00.png`) to get the previous file
-  back. The device falls back to the stock screensaver set.
+  `/mnt/us/linkss/screensavers/bg_ss00.png` and reboot. If a
+  `bg_ss00.png.bak` exists, restore it first
+  (`mv bg_ss00.png.bak bg_ss00.png`) to get the previous file
+  back. The device falls back to the stock screensaver set. Files set aside
+  during install are recoverable from
+  `/mnt/us/dashboard/screensaver-quarantine/` (move one back by hand if needed).
+- **Stop the background auto-refresh:** tap **SS Board 7 Auto-Refresh Off**. It
+  stops the daemon and removes the upstart job, leaving the current board in
+  place.
 - **Remove the firmware fix (only if Step 4 was used):** tap **SS Board 4 Undo
   Firmware Fix**. It removes only that one symlink, and only when it points at
   `/lib/ld-linux-armhf.so.3`. On 5.17+ removing it will break linkss again.
@@ -250,8 +286,51 @@ a running dashboard will suppress the native screensaver.
   package (or delete `/mnt/us/linkss` and reboot). The stock framework then
   resumes control of the sleep screen.
 - **Remove this bundle:** delete `/mnt/us/extensions/screensaver-board/`, the
-  four `ssb-*.sh` files in `/mnt/us/documents/`, and the four `ssb-*.png` files
+  seven `ssb-*.sh` files in `/mnt/us/documents/`, and the five `ssb-*.png` files
   in `/mnt/us/dashboard/`. Nothing else changes.
+
+---
+
+## Auto-refresh (wake + hourly)
+
+After the manual setup above, the board is still static until you tap **SS Board
+2**. The auto-refresh add-on keeps it current in the background:
+
+- **Enable:** tap **SS Board 6 Auto-Refresh On**. It writes the upstart job
+  `/etc/init/screensaver-board-refresh.conf` (atomically, inside a guarded
+  `mntroot rw`/`ro` block), reloads upstart and starts the job. It is
+  idempotent: a byte-identical job file is not rewritten. The job declares
+  `kill timeout 30` so the daemon's trap can run on stop.
+- **What runs:** `bin/refresh-daemon.sh`, installed by the job as
+  `exec /bin/sh /mnt/us/extensions/screensaver-board/bin/refresh-daemon.sh`. The
+  daemon refreshes once ~10s after it starts, then loops in **sliced** waits of
+  at most 10s each and refreshes after a wake event (debounced to at most one
+  per 60s) and otherwise at least every hour while the device stays awake. If
+  `lipc-wait-event` is missing - or returns suspiciously fast several times in a
+  row - it falls back to the sleep-based hourly timer. If `/mnt/us` is unmounted
+  it waits 60s and retries instead of exiting.
+- **Retries:** each cycle calls `refresh.sh` up to 3 times, 20s apart (wrapped in
+  `timeout 300` when available), to absorb the few seconds Wi-Fi needs to settle
+  after a wake. Exit 8 (board URL not configured) is permanent and is not
+  retried. The loop never aborts: a failed refresh keeps the previous board
+  (`refresh.sh` guarantees that).
+- **Asleep has no clock:** while the device is **asleep no process can run**, so
+  the board you see is as fresh as the last refresh before sleep. The daemon
+  cannot refresh during sleep; it refreshes as soon as the device wakes.
+- **Rollback:** tap **SS Board 7 Auto-Refresh Off**. It stops the upstart job
+  first, then the daemon, and removes the job file inside a guarded
+  `mntroot rw`/`ro` block. It is safe to run when nothing was installed.
+- **Logs:** `/mnt/us/dashboard/refresh-daemon.log` (daemon lifecycle and
+  attempts) and `/mnt/us/dashboard/screensaver.log` (the fetch/install trace).
+  Both rotate to `<file>.1` past 256 KiB.
+- **Diagnostics:** **SS Board 1 Diagnose** now includes an
+  `auto-refresh (screensaver-board-refresh)` section: the job file, `initctl
+  status`, the daemon pidfile state, the last 20 lines of `refresh-daemon.log`,
+  and whether `board-url.conf` exists (its contents are not printed).
+
+The daemon never stops or touches the framework, and it uses a single-instance
+lock directory plus pidfile with a live-PID and cmdline check, so a stale lock
+cannot block a restart.
 
 ---
 
@@ -296,6 +375,8 @@ If a launcher becomes available, the menu mirrors the scriptlets:
   - Test PNG format (eips)
   - Refresh board from server
   - Set board as screensaver
+  - Enable auto-refresh (boot)
+  - Disable auto-refresh (rollback)
 
 Until then, use the library scriptlets above.
 
@@ -308,8 +389,24 @@ Until then, use the library scriptlets above.
 - Scripts refuse to fabricate `/mnt/us/dashboard` when `/mnt/us` is not mounted.
 - The scriptlets never fail hard when the bundle is absent: they print a clear
   on-screen message instead.
-- The only rootfs writes are inside the guarded `mntroot rw` / `mntroot ro`
-  blocks of `prepare-ldsymlink.sh` and `remove-ldsymlink.sh`.
+- The only rootfs writes are inside guarded `mntroot rw` / `mntroot ro` blocks:
+  `prepare-ldsymlink.sh`, `remove-ldsymlink.sh`,
+  `install-refresh-autostart.sh`, and `remove-refresh-autostart.sh`. Each sets
+  the writable flag before `mntroot rw` and returns the rootfs to read-only on
+  every exit path, including signals.
+- The refresh daemon never stops or touches the framework, uses a single-instance
+  lock directory plus pidfile (live-PID plus cmdline check), and keeps the
+  previous board on a failed refresh. It waits and retries, rather than exiting,
+  when `/mnt/us` is unmounted.
 - `diagnose.sh` writes exactly one file and nothing else.
-- No pre-existing file is modified. The installer never deletes `bg_*.png`
-  files it did not create; it warns about extras and leaves them alone.
+- No pre-existing file is modified. `set-screensaver.sh` never deletes `bg_*.png`
+  files it did not create: every pool file other than `bg_ss00.png` is MOVED to
+  `/mnt/us/dashboard/screensaver-quarantine/` (recoverable).
+- `tests/` is host-only and is never deployed to the Kindle.
+- **Accepted risk (autostart).** The `screensaver-board-refresh` upstart job runs
+  as root at boot and executes `refresh-daemon.sh` from the user-writable
+  `/mnt/us` partition, so anyone with USB write access could alter it. This is
+  the accepted trade-off of the user's chosen boot autostart; **SS Board 7
+  Auto-Refresh Off** removes the job. The board fetch is also plain HTTP with no
+  signature and the `wget` path has no byte cap (only a post-hoc size check);
+  these are accepted, documented limitations.

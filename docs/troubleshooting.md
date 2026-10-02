@@ -13,7 +13,8 @@ over USB. MRPI keeps its own log under its extension directory.
 
 | Log | Written by | Contains |
 | --- | --- | --- |
-| `/mnt/us/dashboard/screensaver.log` | `refresh.sh`, `set-screensaver.sh`, `test-format.sh`, `prepare-ldsymlink.sh`, `remove-ldsymlink.sh` | The fetch -> normalise -> gate -> install trace, plus the firmware-fix trace. |
+| `/mnt/us/dashboard/screensaver.log` | `refresh.sh`, `set-screensaver.sh`, `test-format.sh`, `prepare-ldsymlink.sh`, `remove-ldsymlink.sh`, `install-refresh-autostart.sh`, `remove-refresh-autostart.sh` | The fetch -> normalise -> gate -> install trace, the firmware-fix trace, and the auto-refresh install/remove trace. |
+| `/mnt/us/dashboard/refresh-daemon.log` | `refresh-daemon.sh` | The background daemon's start, each wake/interval, each refresh attempt, and final failures. Rotated to `.1` past 256 KiB. |
 | `/mnt/us/dashboard/screensaver-diag.log` | `diagnose.sh` (only) | Full read-only device state: firmware, processes, linkss, `blanket`, lipc props, `ld-linux` symlink. |
 | `/mnt/us/extensions/MRInstaller/log/` | MRPI, launched by `ssb-5-install-linkss.sh` | The MRPI install trace. (The directory is named by the scriptlet; the filename `mrinstaller.log` is the conventional one and is **not** asserted by any repository script.) |
 | `/mnt/us/dashboard/dashboard.log` | Legacy `dashboard.sh` / `stop-dashboard.sh` | Only if the old framebuffer dashboard is used. |
@@ -43,8 +44,10 @@ Notes:
 - While the USB cable is connected, `/mnt/us` is unmounted **on the device**, so
   you cannot run a refresh at the same time; the scripts refuse in that state
   with the mount error in section 2.
-- The logs are appended to, not rotated, so the newest entries are at the
-  bottom. The `dmesg`-style `<timestamp>` prefix is `YYYY-MM-DD HH:MM:SS`.
+- The logs are appended to, so the newest entries are at the bottom. The
+  `dmesg`-style `<timestamp>` prefix is `YYYY-MM-DD HH:MM:SS`. The daemon rotates
+  `refresh-daemon.log` and `screensaver.log` to `<file>.1` once they pass 256 KiB,
+  so read the `.1` predecessor if the current file seems to start mid-story.
 - The device-side logs are plain text; any text editor works.
 - The on-screen summary printed by a library scriptlet is visible because the
   scriptlets omit the `# DontUseFBInk` line. If you only have the device (no
@@ -211,42 +214,36 @@ Fix: run **SS Board 2 Install Board** to fetch a fresh board. If a
 ### More than one screensaver file (board shows only sometimes)
 
 ```
-WARNING: other screensaver files exist and are NOT managed by this bundle:
-    /mnt/us/linkss/screensavers/<name>.png
-WARNING: extras can cause unpredictable cycling in linkss.
-Remove them manually if you want exactly one screensaver.
+quarantined extra screensaver file: /mnt/us/linkss/screensavers/<name>.png -> /mnt/us/dashboard/screensaver-quarantine/<name>.png (moved, not deleted)
+WARNING: could not move /mnt/us/linkss/screensavers/<name>.png to /mnt/us/dashboard/screensaver-quarantine; the pool may still cycle.
 ```
 
 Cause: linkss cycles between multiple `bg_*.png` files, so the board appears on
 some sleeps and not others. The usual culprit is the linkss sample
-`00_you_can_delete_me-kv.png` if it was not deleted.
-Fix: delete every screensaver file except the one the bundle owns
-(`bg_large_ss00.png`), then reboot unplugged. The installer deliberately never
-deletes files it did not create.
+`00_you_can_delete_me-kv.png` if it was not removed.
+Fix: run **SS Board 2 Install Board**. After a verified install it moves every
+`*.png` other than `bg_ss00.png` into
+`/mnt/us/dashboard/screensaver-quarantine/` (recoverable, never deleted), so the
+pool holds exactly one file. If a move failed (for example the quarantine dir
+could not be created) the WARNING above is logged and the pool may still cycle;
+free space on `/mnt/us` or move the extras by hand, then re-run **SS Board 2**.
 
-### Wrong panel group
-
-```
-WARNING: screensaver files for a DIFFERENT panel group exist and will be IGNORED:
-    /mnt/us/linkss/screensavers/bg_medium_ss00.png
-WARNING: linkss only reads the 'large' group on this 1072x1448 panel.
-```
-
-or, if the installed filename is wrong:
+### Wrong screensaver filename
 
 ```
-ERROR: installed filename group is '<group>', expected 'large'.
-linkss would ignore '<name>' on this 1072x1448 panel.
+ERROR: installed filename '<name>' is not bg_ss00.png.
+linkss reads bg_ssNN.png from the bind-mounted pool; a wrong name would be ignored.
 ```
 
-Cause: a 1072x1448 PW3 panel uses the linkss group `large`; files for another
-group are not the right ones for this panel.
-Fix: keep only `bg_large_ss00.png`.
-
-> Caveat: `set-screensaver.sh` says other-group files "will be IGNORED", while
-> its own extras warning says other files can cause cycling. The exact linkss
-> behaviour for other-group files is **unverified**. Keeping exactly one file
-> avoids both outcomes.
+Cause: on firmware 5.5 and newer, linkss's `shuffless` names pool files
+`bg_ss00.png`, `bg_ss01.png`, ... This bundle owns exactly `bg_ss00.png` and
+`set-screensaver.sh` now always installs that final name directly, so a wrong or
+legacy name (`bg_large_ss00.png`, `bg_ss01.png`, ...) is either quarantined as an
+extra or refused.
+Fix: run **SS Board 2 Install Board**. It installs `bg_ss00.png` and quarantines
+any other pool file. A legacy `bg_<group>_ssNN.png` written by an older build only
+takes effect after a reboot (when `shuffless` renames it); the current script
+avoids that delay by writing `bg_ss00.png` itself.
 
 ### Rootfs was left read-write
 
@@ -332,6 +329,38 @@ After it restarts unplugged, sleeping should show a screensaver.
 MRPI normally reboots the device when it finishes, so a truncated summary is
 expected, not an error.
 
+### The board shows a stale time / old prayer times
+
+Cause: the board is a **static image**. The Kindle does not redraw it by itself;
+the visible board is as fresh as the last successful refresh. If auto-refresh is
+not enabled, it is frozen at the moment you last tapped **SS Board 2 Install
+Board**. Also, while the device is **asleep no process can run**, so the board
+shown on wake is from the last refresh before sleep.
+
+Fix:
+
+1. Confirm auto-refresh is enabled: tap **SS Board 6 Auto-Refresh On** (or check
+   that `/etc/init/screensaver-board-refresh.conf` exists). With it enabled the
+   daemon refreshes on every wake and at least hourly while the device is awake.
+   The cadence is: a sliced 10-second wait, a refresh on each wake debounced to
+   at most one per 60s, and an hourly floor while continuously awake.
+2. Check `/mnt/us/dashboard/refresh-daemon.log` for the daemon start, each
+   wake/interval, and the per-attempt result; check
+   `/mnt/us/dashboard/screensaver.log` for the fetch/install trace. Both logs are
+   rotated to `<file>.1` once they pass 256 KiB, so read the current file and its
+   `.1` predecessor if the newest entries look truncated.
+3. Run **SS Board 1 Diagnose** and read the
+   `auto-refresh (screensaver-board-refresh)` section: it shows the job file, the
+   `initctl status`, the daemon pidfile state, the last 20 lines of
+   `refresh-daemon.log`, and whether `board-url.conf` exists.
+4. Wake the device (open the cover or press power) so a refresh can run; if the
+   server is unreachable, the previous board is kept and the daemon retries on
+   the next cycle (a refresh.sh exit 8, "board URL not configured", is permanent
+   and is not retried - create `board-url.conf` first).
+5. To refresh immediately, tap **SS Board 2 Install Board**.
+
+To turn automatic refreshing off, tap **SS Board 7 Auto-Refresh Off**.
+
 ### Nothing happens when tapping a library entry
 
 Cause: the library has not rescanned after files were copied.
@@ -346,10 +375,11 @@ icons landed at `/mnt/us/documents/` and `/mnt/us/dashboard/ssb-*.png`.
 | --- | --- | --- |
 | Stock/default screensaver appears instead of the board. | `linkss/screensavers/` is empty, so linkss disables itself. | Run **SS Board 2 Install Board**, then reboot unplugged. |
 | `eips: paint_image> cannot open "...":8bit only`. | The fetched PNG was below 8-bit. | `refresh.sh` normalises on-device with linkss's ImageMagick; if it is missing, install linkss (**SS Board 5**). |
-| Board appears only SOME of the time. | More than one PNG in `linkss/screensavers/`; linkss cycles. | Keep exactly one file; delete extras (including the linkss sample `00_you_can_delete_me-kv.png`). |
+| Board appears only SOME of the time. | More than one PNG in `linkss/screensavers/`; linkss cycles. | Run **SS Board 2 Install Board**; it moves every extra `*.png` to `/mnt/us/dashboard/screensaver-quarantine/` (recoverable), leaving exactly one. |
 | MRPI install greyed out or fails. | Missing 5.17+ `/lib/ld-linux.so.3` symlink. | Run **SS Board 3 Firmware Fix**, reboot unplugged, retry. |
 | Nothing happens when tapping. | Library needs a rescan. | Eject/reconnect USB, or restart. |
-| Install looks fine but screensavers never change. | Framework not restarted after install/update. | Reboot, always with the device **UNPLUGGED**. |
+| Install looks fine but screensavers never change. | Framework not restarted after the first install (shuffless must name the pool files). | Reboot the first time, always with the device **UNPLUGGED**; later refreshes of the correctly-named `bg_ss00.png` are read at the next sleep. |
+| The board shows a stale time / old prayer times. | The board is a static image and auto-refresh is off (or the device was asleep). | Enable auto-refresh (**SS Board 6**); it refreshes on wake and at least hourly while awake. See `/mnt/us/dashboard/refresh-daemon.log`. |
 | Log ends at `FAIL: fetch failed ...`. | Network or server unavailable. | Check Wi-Fi and the board URL; retry **SS Board 2**. |
 | `board.png` is stale after midnight. | `board.php` caches a render for up to 60 seconds. | Wait a minute, then refresh. |
 
@@ -363,9 +393,13 @@ icons landed at `/mnt/us/documents/` and `/mnt/us/dashboard/ssb-*.png`.
 | --- | --- |
 | 0 | Success. |
 | 1 | Fetch failed (network/server/size cap) - previous board kept. |
-| 2 | Could not back up `board.png`, or could not move the file into place. |
-| 3 | The device renderer rejected the board - previous board kept. |
+| 2 | Could not back up `board.png`/move it into place, OR propagated from `set-screensaver.sh` (linkss missing or a bad source). |
+| 3 | The device renderer rejected the board - previous board kept (refresh.sh's own rejection). |
 | 4 | `set-screensaver.sh` is missing. |
+| 5 | Propagated from `set-screensaver.sh`: failed to move the file into place. |
+| 6 | Propagated from `set-screensaver.sh`: installed file missing/empty or IHDR not 1072x1448. |
+| 7 | Propagated from `set-screensaver.sh`: installed basename is not `bg_ss00.png`. |
+| 8 | The board URL is not configured (`/mnt/us/dashboard/board-url.conf` missing/placeholder). Permanent: the daemon does not retry it. |
 | 9 | Another instance holds the lock. |
 | 10 | `/mnt/us` is not a mount. |
 
@@ -373,13 +407,13 @@ icons landed at `/mnt/us/documents/` and `/mnt/us/dashboard/ssb-*.png`.
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Installed and verified. |
-| 2 | `/mnt/us/linkss` missing, or source missing/empty/not PNG/wrong size. |
+| 0 | Installed and verified (extras quarantined). |
+| 2 | `/mnt/us/linkss` missing, `lib-pool.sh` missing, or source missing/empty/not PNG/wrong size. |
 | 3 | Could not create the screensaver directory. |
 | 4 | Copy to the temp file failed. |
 | 5 | Move into place failed. |
 | 6 | Installed file missing/empty or IHDR not 1072x1448. |
-| 7 | Installed filename's panel group is wrong. |
+| 7 | Installed basename is not exactly `bg_ss00.png`. |
 | 9 | Another instance holds the lock. |
 | 10 | `/mnt/us` is not a mount. |
 
