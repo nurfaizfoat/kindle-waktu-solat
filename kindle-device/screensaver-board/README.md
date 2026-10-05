@@ -52,6 +52,13 @@ on-screen output is visible.
 | **SS Board 5 Install LinksS** | runs MRPI `./bin/mrinstaller.sh launch_installer` | `/mnt/us/extensions/MRInstaller/log/` |
 | **SS Board 6 Auto-Refresh On** | `bin/install-refresh-autostart.sh` (upstart job) | `/mnt/us/dashboard/screensaver.log` |
 | **SS Board 7 Auto-Refresh Off** | `bin/remove-refresh-autostart.sh` (rollback) | `/mnt/us/dashboard/screensaver.log` |
+| **Refresh Waktu Solat** | `bin/refresh.sh` (one-tap daily use) | `/mnt/us/dashboard/screensaver.log`, `refresh-last-reason` |
+
+**Refresh Waktu Solat** is the everyday entry: it is the same fetch/normalise/gate/
+install as SS Board 2, but it prints a plain-English verdict plus the recorded
+reason (`/mnt/us/dashboard/refresh-last-reason`) on screen, so a failure says
+*why* (for example a host bot/JS challenge returning HTML instead of a PNG)
+without a PC. Use SS Board 2 for the first install; use this entry afterwards.
 
 ---
 
@@ -70,6 +77,7 @@ screensaver-board/
   bin/test-format.sh         draws the PNG with /usr/sbin/eips (cheap gate)
   bin/set-screensaver.sh     installs exactly ONE screensaver (bg_ss00.png)
   bin/lib-pool.sh            SOURCED helper: quarantine non-bg_ss00.png pool files
+  bin/lib-payload.sh         SOURCED helper: describe a non-PNG download (network vs HTML vs host bot challenge)
   bin/refresh.sh             fetch board -> gate -> set screensaver
   bin/refresh-daemon.sh      refresh on wake + at least hourly while awake
   bin/install-refresh-autostart.sh  install the upstart job; guarded mntroot rw/ro
@@ -83,6 +91,7 @@ screensaver-board/
     ssb-5-install-linkss.sh
     ssb-6-autostart-on.sh
     ssb-7-autostart-off.sh
+    ssb-8-refresh.sh
   icons/                     library thumbnails      -> /mnt/us/dashboard/
     ssb-1-diagnose.png
     ssb-2-install.png
@@ -91,14 +100,17 @@ screensaver-board/
     ssb-5-install-linkss.png
     ssb-6-autostart-on.png
     ssb-7-autostart-off.png
+    ssb-8-refresh.png
   tests/                     HOST-ONLY test harness (never deployed)
     run.sh
     test-pool.sh
+    test-classify.sh
 ```
 
 Shared log: `/mnt/us/dashboard/screensaver.log`
 Daemon log: `/mnt/us/dashboard/refresh-daemon.log` (rotated to `.1` past 256 KiB)
 Diagnostic log: `/mnt/us/dashboard/screensaver-diag.log`
+Last-run reason: `/mnt/us/dashboard/refresh-last-reason` (one line; read by the Refresh Waktu Solat entry)
 Quarantine dir: `/mnt/us/dashboard/screensaver-quarantine/` (pool extras, recoverable)
 
 Copy the bundle to the device over USB:

@@ -38,10 +38,12 @@ DIR=/mnt/us/dashboard
 IMG="$DIR/board.png"
 TMP="$DIR/board.png.$$.tmp"
 LOG="$DIR/screensaver.log"
+REASON="$DIR/refresh-last-reason"
 LOCK="$DIR/refresh.lock"
 MAXBYTES=2097152
 BIN=$(cd "$(dirname "$0")" && pwd)
 CONV_TMP=""
+FETCH_DETAIL=""
 
 # --- /mnt/us must be a real mount, or we would fabricate a dead dashboard dir
 if ! awk '$2=="/mnt/us"{f=1} END{exit !f}' /proc/mounts 2>/dev/null; then
@@ -64,6 +66,18 @@ log() {
   echo "$_ts $*" >> "$LOG"
 }
 
+# set_reason <text>: record the human-readable outcome in a one-line file so the
+# "Refresh Waktu Solat" library scriptlet can show WHY a run succeeded or failed
+# without the user reading the full log. Best-effort: a missing $DIR must not
+# abort the run.
+set_reason() {
+  printf '%s\n' "$1" > "$REASON" 2>/dev/null
+}
+
+# Clear any reason from a previous run so a stale message can never be shown as
+# if it described this run.
+rm -f "$REASON" 2>/dev/null
+
 # --- configuration check ----------------------------------------------------
 # Refuse to fetch anything until the user has pointed BOARD_URL at their own
 # board deployment. The placeholder is never a real host.
@@ -73,6 +87,7 @@ if [ -z "${BOARD_URL:-}" ] || [ "$BOARD_URL" = "https://example.com/waktu/board.
   log "    BOARD_URL=\"https://your-host/path/board.php\""
   log "Template: kindle-device/board-url.conf.sample in the repository."
   log "Refusing to fetch until it is configured."
+  set_reason "FAIL: the board URL is not configured. Set BOARD_URL in $BOARD_URL_CONF."
   exit 8
 fi
 
@@ -89,11 +104,13 @@ if ! mkdir "$LOCK" 2>/dev/null; then
   if [ -n "${_oldpid:-}" ] && kill -0 "$_oldpid" 2>/dev/null \
      && grep -qa 'refresh\.sh' "/proc/$_oldpid/cmdline" 2>/dev/null; then
     log "REFUSING: another refresh is running (pid $_oldpid)."
+    set_reason "FAIL: another refresh is already running."
     exit 9
   fi
   rm -rf "$LOCK" 2>/dev/null
   if ! mkdir "$LOCK" 2>/dev/null; then
     log "REFUSING: could not acquire lock $LOCK."
+    set_reason "FAIL: could not acquire the refresh lock."
     exit 9
   fi
 fi
@@ -102,29 +119,52 @@ trap 'cleanup_lock' EXIT
 trap 'cleanup_lock; exit 130' INT TERM HUP
 
 # --- fetch + validate (mirrors dashboard.sh) --------------------------------
+# classify_payload() lives in lib-payload.sh, sourced so the host tests can
+# exercise it. The inline fallback keeps a refresh working if the helper is
+# missing from the bundle, instead of aborting on an undefined function.
+if [ -f "$BIN/lib-payload.sh" ]; then
+  . "$BIN/lib-payload.sh"
+else
+  classify_payload() { echo "the download is not a PNG"; }
+fi
+
 fetch_board() {
+  FETCH_DETAIL=""
   rm -f "$TMP"
 
+  _rc=0
   if command -v curl >/dev/null 2>&1; then
-    curl -s -m 30 --max-filesize "$MAXBYTES" -o "$TMP" "$BOARD_URL" || return 1
+    curl -s -m 30 --max-filesize "$MAXBYTES" -o "$TMP" "$BOARD_URL" || _rc=$?
   elif command -v wget >/dev/null 2>&1; then
-    wget -q -T 30 -O "$TMP" "$BOARD_URL" || return 1
+    wget -q -T 30 -O "$TMP" "$BOARD_URL" || _rc=$?
   else
+    FETCH_DETAIL="neither curl nor wget is available"
+    return 1
+  fi
+  if [ "$_rc" -ne 0 ]; then
+    # curl exit 63 is the --max-filesize cap, not a network failure.
+    if [ "$_rc" -eq 63 ]; then
+      FETCH_DETAIL="the download exceeded the ${MAXBYTES}-byte cap"
+    else
+      FETCH_DETAIL="the download failed (command exit $_rc; network down or the server refused the request)"
+    fi
     return 1
   fi
 
-  [ -s "$TMP" ] || return 1
+  [ -s "$TMP" ] || { FETCH_DETAIL="the download was empty"; return 1; }
 
   # Enforce the size cap for both branches (wget has no portable max-size flag).
   _size=$(wc -c < "$TMP" 2>/dev/null)
   if [ -n "$_size" ] && [ "$_size" -gt "$MAXBYTES" ]; then
-    log "FAIL: download is ${_size} bytes, over the ${MAXBYTES}-byte cap - rejected."
-    rm -f "$TMP"
+    FETCH_DETAIL="the download is ${_size} bytes, over the ${MAXBYTES}-byte cap"
     return 1
   fi
 
   SIG=$(dd if="$TMP" bs=1 count=4 2>/dev/null | od -An -tx1 2>/dev/null | tr -d ' \n')
-  [ "$SIG" = "89504e47" ] || return 1
+  if [ "$SIG" != "89504e47" ]; then
+    FETCH_DETAIL=$(classify_payload "$TMP")
+    return 1
+  fi
 
   return 0
 }
@@ -132,8 +172,13 @@ fetch_board() {
 log "=== refresh start ==="
 
 if ! fetch_board; then
-  log "FAIL: fetch failed (network down, server unreachable, or over size cap)."
+  log "FAIL: fetch failed - ${FETCH_DETAIL:-unknown reason}."
+  case "$FETCH_DETAIL" in
+    *challenge*)
+      log "HINT: the device cannot solve a JavaScript challenge. Disable the host's bot/WAF protection for the board URL, or host the board somewhere that serves a plain PNG." ;;
+  esac
   log "Keeping the existing $IMG unchanged."
+  set_reason "FAIL: fetch failed - ${FETCH_DETAIL:-unknown reason}. The previous board was kept."
   rm -f "$TMP"
   exit 1
 fi
@@ -192,6 +237,7 @@ if [ -z "$GATE_SRC" ]; then
   log "REFUSING to install: the device renderer rejected this board."
   log "Preserved the previous good board at $IMG (not overwritten)."
   log "See to-png8.py / README.md for the host-side re-encode."
+  set_reason "FAIL: the device renderer rejected the fetched board (unsupported PNG format or wrong size). The previous board was kept."
   rm -f "$TMP" "$DIR"/board.norm.*.$$.png
   exit 3
 fi
@@ -204,6 +250,7 @@ if [ -e "$IMG" ]; then
     log "backup created: $BAK (last-known-good board preserved)"
   else
     log "FAIL: could not back up $IMG to $BAK - refusing to replace it."
+    set_reason "FAIL: could not back up the existing board; refused to replace it."
     rm -f "$TMP" "$DIR"/board.norm.*.$$.png
     exit 2
   fi
@@ -211,6 +258,7 @@ fi
 
 if ! mv "$GATE_SRC" "$IMG"; then
   log "FAIL: could not move the normalised file into place"
+  set_reason "FAIL: could not move the new board into place."
   rm -f "$TMP" "$DIR"/board.norm.*.$$.png
   exit 2
 fi
@@ -220,12 +268,19 @@ log "fetched OK: $IMG ($(wc -c < "$IMG") bytes)"
 # --- install -----------------------------------------------------------------
 if [ ! -f "$BIN/set-screensaver.sh" ]; then
   log "FAIL: set-screensaver.sh is missing"
+  set_reason "FAIL: set-screensaver.sh is missing from the bundle."
   exit 4
 fi
 
 sh "$BIN/set-screensaver.sh" "$IMG"
 RC=$?
 log "set-screensaver exit=$RC"
+
+if [ "$RC" -eq 0 ]; then
+  set_reason "OK: board updated and installed as the screensaver. It appears at the next sleep."
+else
+  set_reason "FAIL: could not install the board (set-screensaver exit $RC). See $LOG."
+fi
 
 log "=== refresh done ==="
 exit "$RC"

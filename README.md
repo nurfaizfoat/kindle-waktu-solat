@@ -120,6 +120,7 @@ Inside `kindle-device/screensaver-board/`:
 | `bin/refresh.sh` | Fetch, normalise, gate and install the board. |
 | `bin/set-screensaver.sh` | Install exactly one screensaver (`bg_ss00.png`) under `/mnt/us/linkss`; quarantine extras. |
 | `bin/lib-pool.sh` | Sourced helper: move non-`bg_ss00.png` pool files to the quarantine dir. |
+| `bin/lib-payload.sh` | Sourced helper: describe a non-PNG download (network vs HTML page vs host bot/JS challenge). |
 | `bin/test-format.sh` | `eips` gate. |
 | `bin/refresh-daemon.sh` | Background refresher: refresh on wake and at least hourly while awake. |
 | `bin/install-refresh-autostart.sh` | Install/start the `screensaver-board-refresh` upstart job (guarded rootfs write). |
@@ -134,8 +135,9 @@ Inside `kindle-device/screensaver-board/`:
 | `documents/ssb-5-install-linkss.sh` | Library scriptlet: run MRPI to install linkss. |
 | `documents/ssb-6-autostart-on.sh` | Library scriptlet: enable auto-refresh. |
 | `documents/ssb-7-autostart-off.sh` | Library scriptlet: disable auto-refresh. |
+| `documents/ssb-8-refresh.sh` | Library scriptlet: one-tap everyday refresh ("Refresh Waktu Solat"). |
 | `tests/` | Host-only test harness; never deployed to the Kindle. |
-| `icons/ssb-1-diagnose.png` to `icons/ssb-7-autostart-off.png` | Library thumbnails, one per scriptlet entry (1-7). |
+| `icons/ssb-1-diagnose.png` to `icons/ssb-8-refresh.png` | Library thumbnails, one per scriptlet entry (1-8). |
 
 ---
 
@@ -259,7 +261,7 @@ Copy from `kindle-device/screensaver-board/` to the Kindle over USB:
 
 The scriptlets point their `# Icon:` lines at `/mnt/us/dashboard/ssb-*.png`, one
 numbered thumbnail per entry (`ssb-1-diagnose.png` ... `ssb-7-autostart-off.png`),
-so all seven library entries show distinct thumbnails. You may need to let the
+so all eight library entries show distinct thumbnails. You may need to let the
 Kindle rescan the library (or reboot) before new entries appear; a library entry
 whose `# Icon:` file is missing or shared with another entry can fail to show.
 
@@ -383,7 +385,7 @@ the screensaver. Reboot unplugged, then test sleep.`
 
 ---
 
-## The seven library entries
+## The library entries
 
 | Library entry | Runs | Writes | When to use |
 | --- | --- | --- | --- |
@@ -394,6 +396,7 @@ the screensaver. Reboot unplugged, then test sleep.`
 | **SS Board 5 Install LinksS** | runs MRPI `./bin/mrinstaller.sh launch_installer` | `/mnt/us/extensions/MRInstaller/log/` | Install the linkss package queued in `/mnt/us/mrpackages`. Reboots when it finishes. |
 | **SS Board 6 Auto-Refresh On** | `bin/install-refresh-autostart.sh` | `/mnt/us/dashboard/screensaver.log` | Install the `screensaver-board-refresh` upstart job so the board refreshes on every wake and at least hourly while awake. |
 | **SS Board 7 Auto-Refresh Off** | `bin/remove-refresh-autostart.sh` | `/mnt/us/dashboard/screensaver.log` | Undo entry 6: stop the daemon and remove the upstart job. Safe when nothing was installed. |
+| **Refresh Waktu Solat** | `bin/refresh.sh` (one-tap) | `/mnt/us/dashboard/screensaver.log`, `refresh-last-reason` | Everyday refresh: same fetch/install as SS Board 2, plus a plain-English verdict and the recorded reason on screen. Use after the first install. |
 
 All scriptlets deliberately carry **no** `# DontUseFBInk` line, so their final
 on-screen summary is visible on the device.
@@ -434,6 +437,7 @@ deletes them.
 | Nothing happens when tapping a library entry. | The library needs a rescan. | Eject and reconnect USB, or restart the device. |
 | Everything looks installed but screensavers never change. | The framework was not restarted after the first install (shuffless must name the pool files). | Reboot the first time, always with the device **UNPLUGGED**; later refreshes of the correctly-named `bg_ss00.png` are read at the next sleep. |
 | The board shows a stale time / old prayer times. | The board is a static image and auto-refresh is off (or the device was asleep). | Enable auto-refresh (**SS Board 6**); it refreshes on wake and at least hourly while awake. Check `/mnt/us/dashboard/refresh-daemon.log`. |
+| Refresh fails with `the server returned an HTML bot/JS challenge, not a PNG`. | The host now serves a JavaScript anti-bot interstitial on every path (HTTP 200, `text/html`), so the PNG magic-byte check fails. The Kindle cannot solve JavaScript. | Disable or whitelist the host's bot/WAF protection for the board URL, or host the board where it is served as a plain PNG. Then tap **Refresh Waktu Solat**. See `docs/troubleshooting.md` section 2. |
 
 The expanded form of this table, with exact log strings and where each log
 lives, is in [`docs/troubleshooting.md`](docs/troubleshooting.md).
@@ -466,7 +470,7 @@ lives, is in [`docs/troubleshooting.md`](docs/troubleshooting.md).
   package (`Update_linkss_0.25.N_uninstall.bin`), or delete `/mnt/us/linkss` and
   reboot. The stock framework then resumes control of the sleep screen.
 - **Remove this bundle:** delete `/mnt/us/extensions/screensaver-board/`, the
-  seven `ssb-*.sh` files in `/mnt/us/documents/`, and the five `ssb-*.png` files
+  eight `ssb-*.sh` files in `/mnt/us/documents/`, and the eight `ssb-*.png` files
   in `/mnt/us/dashboard/`. If auto-refresh is enabled, tap **SS Board 7** first
   so the upstart job and its `/etc/init/screensaver-board-refresh.conf` are
   removed. Nothing else changes.
@@ -517,7 +521,7 @@ lives, is in [`docs/troubleshooting.md`](docs/troubleshooting.md).
   documented limitations (see "Weak content validation").
 - **Bundle README coverage.** `kindle-device/screensaver-board/README.md` is the
   authoritative reference for the bundle's scripts; this root README and it may
-  still differ in wording, but both describe the seven library entries.
+  still differ in wording, but both describe the library entries.
 - **KUAL route is unusable as-is.** `config.xml` / `menu.json` are shipped, but
   the firmware has no KUAL and no working Kindlet launcher, so the KUAL menu
   cannot be used on this device.

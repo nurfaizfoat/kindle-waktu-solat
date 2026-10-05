@@ -56,6 +56,14 @@ else
   FAILS=$((FAILS + 1))
 fi
 
+echo "== classify tests =="
+if sh "$HERE/test-classify.sh"; then
+  echo "OK   test-classify.sh"
+else
+  echo "FAIL test-classify.sh"
+  FAILS=$((FAILS + 1))
+fi
+
 echo ""
 if [ "$FAILS" -ne 0 ]; then
   echo "$FAILS check(s) failed"

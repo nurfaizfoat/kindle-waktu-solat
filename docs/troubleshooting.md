@@ -15,6 +15,7 @@ over USB. MRPI keeps its own log under its extension directory.
 | --- | --- | --- |
 | `/mnt/us/dashboard/screensaver.log` | `refresh.sh`, `set-screensaver.sh`, `test-format.sh`, `prepare-ldsymlink.sh`, `remove-ldsymlink.sh`, `install-refresh-autostart.sh`, `remove-refresh-autostart.sh` | The fetch -> normalise -> gate -> install trace, the firmware-fix trace, and the auto-refresh install/remove trace. |
 | `/mnt/us/dashboard/refresh-daemon.log` | `refresh-daemon.sh` | The background daemon's start, each wake/interval, each refresh attempt, and final failures. Rotated to `.1` past 256 KiB. |
+| `/mnt/us/dashboard/refresh-last-reason` | `refresh.sh` | One line: the outcome of the last refresh. Cleared at the start of each run and read by the **Refresh Waktu Solat** library entry. |
 | `/mnt/us/dashboard/screensaver-diag.log` | `diagnose.sh` (only) | Full read-only device state: firmware, processes, linkss, `blanket`, lipc props, `ld-linux` symlink. |
 | `/mnt/us/extensions/MRInstaller/log/` | MRPI, launched by `ssb-5-install-linkss.sh` | The MRPI install trace. (The directory is named by the scriptlet; the filename `mrinstaller.log` is the conventional one and is **not** asserted by any repository script.) |
 | `/mnt/us/dashboard/dashboard.log` | Legacy `dashboard.sh` / `stop-dashboard.sh` | Only if the old framebuffer dashboard is used. |
@@ -106,20 +107,43 @@ removed and re-acquired automatically. As a last resort, reboot.
 
 ### Fetch failed
 
+`refresh.sh` records why the fetch failed and keeps the previous board (exit 1).
+The reason is also written to `/mnt/us/dashboard/refresh-last-reason`, which the
+**Refresh Waktu Solat** entry prints on screen.
+
 ```
-FAIL: fetch failed (network down, server unreachable, or over size cap).
+FAIL: fetch failed - the download failed (command exit <N>; network down or the server refused the request).
+FAIL: fetch failed - the download was empty.
+FAIL: fetch failed - the download is <N> bytes, over the 2097152-byte cap.
+FAIL: fetch failed - the download exceeded the 2097152-byte cap.
+FAIL: fetch failed - the download is not a PNG (first bytes: <hex>).
+FAIL: fetch failed - the server returned an HTML page, not a PNG (title: '...').
+FAIL: fetch failed - the server returned an HTML bot/JS challenge, not a PNG (title: 'One moment, please...').
 Keeping the existing /mnt/us/dashboard/board.png unchanged.
 ```
 
-or
-
-```
-FAIL: download is <N> bytes, over the 2097152-byte cap - rejected.
-```
-
-Cause: no network, the server is down, or the download exceeded the 2 MiB cap.
+Cause: no network, the server is down, the download exceeded the 2 MiB cap, or
+the URL returned HTML instead of a PNG.
 Fix: confirm Wi-Fi is on and the board URL responds; the previous good board is
-kept, so nothing is lost. Retry **SS Board 2 Install Board**.
+kept, so nothing is lost. Retry **Refresh Waktu Solat** (or **SS Board 2 Install
+Board**).
+
+#### The server returned an HTML bot/JS challenge
+
+```
+FAIL: fetch failed - the server returned an HTML bot/JS challenge, not a PNG (title: 'One moment, please...').
+HINT: the device cannot solve a JavaScript challenge. Disable the host's bot/WAF protection for the board URL, or host the board somewhere that serves a plain PNG.
+```
+
+Cause: the host now answers every request with a JavaScript anti-bot
+interstitial (HTTP 200, `Content-Type: text/html`, a `<title>One moment,
+please...</title>` page), typically after a security feature was enabled or the
+site moved behind a WAF/CDN. The Kindle's `curl`/`wget` cannot execute
+JavaScript, so it can never pass, and the PNG magic-byte check fails. Every path
+on the host returns the same page, so this is not specific to `board.php`.
+Fix: on the host, disable or whitelist the bot/WAF protection for the board URL
+(or serve the board from somewhere that returns a plain PNG), then tap **Refresh
+Waktu Solat**. This is a server-side problem; no on-device script can solve it.
 
 ### The renderer rejected the board
 
@@ -357,7 +381,7 @@ Fix:
    server is unreachable, the previous board is kept and the daemon retries on
    the next cycle (a refresh.sh exit 8, "board URL not configured", is permanent
    and is not retried - create `board-url.conf` first).
-5. To refresh immediately, tap **SS Board 2 Install Board**.
+5. To refresh immediately, tap **Refresh Waktu Solat** (or **SS Board 2 Install Board**); the verdict and the reason are shown on screen.
 
 To turn automatic refreshing off, tap **SS Board 7 Auto-Refresh Off**.
 
@@ -380,7 +404,8 @@ icons landed at `/mnt/us/documents/` and `/mnt/us/dashboard/ssb-*.png`.
 | Nothing happens when tapping. | Library needs a rescan. | Eject/reconnect USB, or restart. |
 | Install looks fine but screensavers never change. | Framework not restarted after the first install (shuffless must name the pool files). | Reboot the first time, always with the device **UNPLUGGED**; later refreshes of the correctly-named `bg_ss00.png` are read at the next sleep. |
 | The board shows a stale time / old prayer times. | The board is a static image and auto-refresh is off (or the device was asleep). | Enable auto-refresh (**SS Board 6**); it refreshes on wake and at least hourly while awake. See `/mnt/us/dashboard/refresh-daemon.log`. |
-| Log ends at `FAIL: fetch failed ...`. | Network or server unavailable. | Check Wi-Fi and the board URL; retry **SS Board 2**. |
+| Log ends at `FAIL: fetch failed ...`. | Network or server unavailable. | Check Wi-Fi and the board URL; read `refresh-last-reason`; retry **Refresh Waktu Solat**. |
+| `FAIL: fetch failed - the server returned an HTML bot/JS challenge, not a PNG`. | Host bot/WAF protection now challenges the board URL; the Kindle cannot solve JavaScript. | Disable/whitelist bot protection for the board URL on the host, then tap **Refresh Waktu Solat**. |
 | `board.png` is stale after midnight. | `board.php` caches a render for up to 60 seconds. | Wait a minute, then refresh. |
 
 ---
@@ -392,7 +417,7 @@ icons landed at `/mnt/us/documents/` and `/mnt/us/dashboard/ssb-*.png`.
 | Code | Meaning |
 | --- | --- |
 | 0 | Success. |
-| 1 | Fetch failed (network/server/size cap) - previous board kept. |
+| 1 | Fetch failed (network/server/size cap/empty/non-PNG/HTML challenge) - previous board kept. |
 | 2 | Could not back up `board.png`/move it into place, OR propagated from `set-screensaver.sh` (linkss missing or a bad source). |
 | 3 | The device renderer rejected the board - previous board kept (refresh.sh's own rejection). |
 | 4 | `set-screensaver.sh` is missing. |
@@ -459,8 +484,8 @@ When you are unsure what is wrong:
      normal use.
    - `=== ld-linux symlink (5.17+ workaround check) ===` - expected result after
      the fix: `/lib/ld-linux.so.3 -> /lib/ld-linux-armhf.so.3`.
-4. Then tap **SS Board 2 Install Board** and read
-   `/mnt/us/dashboard/screensaver.log`.
+4. Then tap **Refresh Waktu Solat** (or **SS Board 2 Install Board**) and read
+   `/mnt/us/dashboard/screensaver.log` and `refresh-last-reason`.
 
 Remember: `diagnose.sh` is read-only apart from its own log, so it is always
 safe to run first.

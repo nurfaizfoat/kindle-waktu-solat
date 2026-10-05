@@ -324,8 +324,8 @@ launcher available is **library scriptlets**: a `.sh` file placed in
 ```
 
 The Kindle shows that file in the library as a tappable "book". Tapping it runs
-the script. The bundle ships seven scriptlets
-(`documents/ssb-1-diagnose.sh` to `documents/ssb-7-autostart-off.sh`); each one:
+the script. The bundle ships eight scriptlets
+(`documents/ssb-1-diagnose.sh` to `documents/ssb-8-refresh.sh`); each one:
 
 - checks that its target `bin/` script exists and prints a clear message
   (`Bundle not found on this Kindle.` + the expected path) if the bundle has not
@@ -357,7 +357,14 @@ be cut short.
 install/remove the `screensaver-board-refresh` upstart job described in section
 3.4. Each has its own numbered icon (`ssb-6-autostart-on.png`,
 `ssb-7-autostart-off.png`), so the library shows distinct thumbnails for all
-seven entries.
+eight entries.
+
+`ssb-8-refresh.sh` ("Refresh Waktu Solat") is the everyday one-tap entry: it runs
+`bin/refresh.sh`, then prints a plain-English verdict and the recorded reason
+from `/mnt/us/dashboard/refresh-last-reason`. `refresh.sh` sources
+`bin/lib-payload.sh` to classify a non-PNG download (network failure vs HTML
+error page vs a host bot/JS challenge) so the on-screen reason is actionable
+without a PC.
 
 ### The secondary KUAL route
 
