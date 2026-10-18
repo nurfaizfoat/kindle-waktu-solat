@@ -1232,7 +1232,9 @@ function pw_render_board(array $cfg, string $out, DateTimeImmutable $now): array
         imagecolorset($im, $i, $level, $level, $level);
     }
 
-    $tmp = $out . '.tmp';
+    // Unique temp name: concurrent requests must not write the same temp file
+    // and race on the rename (the loser would fail and log a warning).
+    $tmp = $out . '.' . getmypid() . '.tmp';
     $ok  = imagepng($im, $tmp, 9);
     imagedestroy($im);
 
