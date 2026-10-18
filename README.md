@@ -100,6 +100,7 @@ artifacts) is not part of the project and is intended to be excluded via
 | `deploy/kindle-dashboard.zip` | Server bundle without the hadith collection. |
 | `deploy/kindle-dashboard-hadith.zip` | Server bundle including `hadiths-ms.json` and the updated `lib.php`. |
 | `deploy/stage/waktu/` | Staging tree matching the server's `waktu` directory. |
+| `deploy/vps/` | nginx + PHP-FPM provisioning for the Ubuntu VPS (`deploy.sh`, `setup-server.sh`, `nginx-waktu.conf`). |
 | `kindle-device/` | On-device scripts and the screensaver bundle. |
 | `kindle-device/screensaver-board/` | **The active screensaver bundle** (see below). |
 | `kindle-device/dashboard.sh` | Old framebuffer-takeover dashboard (retired; fallback). |
@@ -176,6 +177,11 @@ uses a `waktu/` directory name instead of `dashboard/`, and adds a `.htaccess`
 that forces `no-store`/`no-cache` and disables directory listing). The
 `deploy/*.zip` files are packaged versions of that staging tree. Either copy
 `dashboard/` directly, or upload the staging tree / unzip one of the bundles.
+
+For the Ubuntu VPS deployment, `deploy/vps/` automates this: nginx serves the
+staging tree at `/waktu/board.php`, PHP-FPM runs only that entry point, and the
+data/output directories are not exposed over HTTP. See
+[`deploy/vps/README.md`](deploy/vps/README.md).
 
 ### 3. Meet the host requirements
 

@@ -9,6 +9,9 @@ winterbreak-staging-*/
 
 # Local tooling artifacts
 .atl/
+.engram/
+# Real VPS address/domain (local only; the public repo uses placeholders)
+deploy/vps/vps.env
 
 # --- OS / editor noise -------------------------------------------------------
 .DS_Store
